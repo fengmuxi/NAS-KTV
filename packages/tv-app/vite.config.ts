@@ -31,7 +31,10 @@ export default defineConfig({
     }
   },
   build: {
-    target: ['es2021', 'chrome100', 'safari13'],
+    // 兼容旧 Android WebView（Chrome < 71）：esbuild 会把 ?. / ?? 等 ES2020 语法
+    // 降级为 ES5 兼容写法，避免旧 WebView 解析报白屏。桌面端 WebView2/WKWebView
+    // 远高于此版本，降级无副作用。
+    target: 'chrome70',
     minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
     sourcemap: !!process.env.TAURI_DEBUG
   }

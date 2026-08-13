@@ -21,7 +21,7 @@ body {
 
 /* hallmark: atmospheric / 右上角扫码点歌徽标（半透明紧凑，不遮挡 MV 主体） */
 .qr-badge {
-  background: color-mix(in oklab, var(--color-paper-2) 88%, transparent);
+  background: rgba(15,23,31,0.88);
   backdrop-filter: blur(4px);
 }
 

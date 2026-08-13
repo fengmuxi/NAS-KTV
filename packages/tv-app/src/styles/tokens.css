@@ -6,31 +6,31 @@
 
 :root {
   /* Paper（背景层 - 深色 KTV 沉浸环境）*/
-  --color-paper: oklch(15% 0.02 250);        /* 主背景 - 极深蓝灰 */
-  --color-paper-2: oklch(20% 0.02 250);      /* 卡片背景 */
-  --color-paper-3: oklch(25% 0.025 250);     /* hover 状态 */
+  --color-paper: rgb(5,12,19);        /* 主背景 - 极深蓝灰 */
+  --color-paper-2: rgb(15,23,31);      /* 卡片背景 */
+  --color-paper-3: rgb(24,35,45);     /* hover 状态 */
 
   /* Ink（文字层 - 高对比度）*/
-  --color-ink: oklch(98% 0.005 250);         /* 主文字 - 近白 */
-  --color-ink-2: oklch(80% 0.01 250);        /* 次要文字 */
-  --color-ink-3: oklch(60% 0.015 250);       /* 三级文字/占位 */
+  --color-ink: rgb(246,249,252);         /* 主文字 - 近白 */
+  --color-ink-2: rgb(185,190,196);        /* 次要文字 */
+  --color-ink-3: rgb(122,129,137);       /* 三级文字/占位 */
 
   /* Accent（强调色 - 亮蓝，深背景上的高对比）*/
-  --color-accent: oklch(70% 0.15 220);       /* 主强调色 - 亮蓝 */
-  --color-accent-hover: oklch(75% 0.18 220); /* hover */
-  --color-accent-active: oklch(65% 0.16 220);/* active 态 */
-  --color-accent-soft: oklch(25% 0.05 220);  /* 浅强调背景 */
+  --color-accent: rgb(0,178,222);       /* 主强调色 - 亮蓝 */
+  --color-accent-hover: rgb(0,197,252); /* hover */
+  --color-accent-active: rgb(0,163,210);/* active 态 */
+  --color-accent-soft: rgb(0,39,50);  /* 浅强调背景 */
 
   /* 语义色 */
-  --color-danger: oklch(65% 0.20 25);        /* 红色 */
-  --color-warning: oklch(75% 0.15 85);       /* 琥珀色 */
-  --color-success: oklch(70% 0.15 145);      /* 绿色 */
-  --color-loading: oklch(50% 0.02 250);      /* loading 态文字 */
+  --color-danger: rgb(241,77,76);        /* 红色 */
+  --color-warning: rgb(217,165,20);       /* 琥珀色 */
+  --color-success: rgb(91,182,97);      /* 绿色 */
+  --color-loading: rgb(91,100,111);      /* loading 态文字 */
 
   /* 焦点 ring（≥3:1 对比）*/
-  --color-focus: oklch(75% 0.18 220);
-  --color-border: oklch(30% 0.02 250);       /* hairline border */
-  --color-black: oklch(0% 0 0);              /* 全屏 MV 黑边背景 */
+  --color-focus: rgb(0,197,252);
+  --color-border: rgb(38,47,56);       /* hairline border */
+  --color-black: rgb(0,0,0);              /* 全屏 MV 黑边背景 */
 
   /* 字体 */
   --font-display: 'Space Grotesk', system-ui, sans-serif;
@@ -71,12 +71,12 @@
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 
   /* 阴影 */
-  --shadow-sm: 0 1px 2px oklch(10% 0.02 250 / 0.3);
-  --shadow-md: 0 4px 6px oklch(10% 0.02 250 / 0.4);
-  --shadow-lg: 0 10px 15px oklch(10% 0.02 250 / 0.5);
+  --shadow-sm: 0 1px 2px rgba(1,4,8,0.3);
+  --shadow-md: 0 4px 6px rgba(1,4,8,0.4);
+  --shadow-lg: 0 10px 15px rgba(1,4,8,0.5);
 
   /* 全屏 MV 叠加层歌词投影：视频背景上保证可读性（10-foot 双影） */
-  --shadow-lyrics: 0 2px 12px oklch(0% 0 0 / 0.85), 0 0 4px oklch(0% 0 0 / 0.7);
+  --shadow-lyrics: 0 2px 12px rgba(0,0,0,0.85), 0 0 4px rgba(0,0,0,0.7);
 
   /* 动画时长 */
   --dur-fast: 150ms;
@@ -84,29 +84,29 @@
   --dur-slow: 400ms;
 
   /* 阶段6.5 新增令牌 - 高级控制面板视觉 */
-  --color-accent-2: oklch(65% 0.12 280);  /* 次强调色，紫蓝色调，用于混响面板 */
+  --color-accent-2: rgb(129,134,215);  /* 次强调色，紫蓝色调，用于混响面板 */
   --radius-2xl: 24px;                       /* 大圆角面板 */
   --space-5xl: 128px;                       /* 高级面板展开层间距 */
   --ring-width: 3px;                        /* 焦点环宽度 */
   --ring-offset: 4px;                       /* 焦点环偏移 */
 
   /* OSD 反馈：半透明近黑圆底（毛玻璃：强 blur + 饱和度，透出内容成光斑防叠影） */
-  --color-osd: oklch(10% 0.015 250 / 0.55);   /* 圆底 - 半透明近黑 */
-  --color-osd-track: oklch(35% 0.02 250 / 0.6); /* 进度环轨道 */
+  --color-osd: rgba(1,4,7,0.55);   /* 圆底 - 半透明近黑 */
+  --color-osd-track: rgba(51,60,69,0.6); /* 进度环轨道 */
 
   /* OSD 质感阴影：深投影悬浮 + 1px 细描边 + 顶部内高光 */
-  --shadow-osd: 0 12px 48px oklch(0% 0 0 / 0.6), 0 0 0 1px oklch(100% 0 0 / 0.1),
-    inset 0 1px 0 oklch(100% 0 0 / 0.12);
+  --shadow-osd: 0 12px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.1),
+    inset 0 1px 0 rgba(255,255,255,0.12);
 
   /* Redesign 2026-08-01 · 焦点/激活光晕（atmospheric 分层语言，替代 hairline） */
-  --color-glow: oklch(70% 0.15 220 / 0.35);          /* 光晕色 = accent 的透射 */
-  --shadow-glow: 0 0 32px oklch(70% 0.15 220 / 0.28),
-    0 0 0 1px oklch(70% 0.15 220 / 0.45);            /* 焦点卡：外发光 + 细亮边 */
-  --shadow-glow-soft: 0 0 24px oklch(70% 0.15 220 / 0.18),
-    0 0 0 1px oklch(70% 0.15 220 / 0.3);             /* 播放中卡：柔和光晕 */
-  --grad-card: linear-gradient(180deg, oklch(23% 0.03 250) 0%, oklch(17% 0.02 250) 100%);
+  --color-glow: rgba(0,178,222,0.35);          /* 光晕色 = accent 的透射 */
+  --shadow-glow: 0 0 32px rgba(0,178,222,0.28),
+    0 0 0 1px rgba(0,178,222,0.45);            /* 焦点卡：外发光 + 细亮边 */
+  --shadow-glow-soft: 0 0 24px rgba(0,178,222,0.18),
+    0 0 0 1px rgba(0,178,222,0.3);             /* 播放中卡：柔和光晕 */
+  --grad-card: linear-gradient(180deg, rgb(18,30,43) 0%, rgb(9,16,24) 100%);
                                                       /* 卡片封面渐变底（无图占位） */
-  --grad-stage: linear-gradient(180deg, oklch(20% 0.03 250 / 0) 0%, oklch(15% 0.02 250) 100%);
+  --grad-stage: linear-gradient(180deg, rgba(11,23,35,0) 0%, rgb(5,12,19) 100%);
                                                       /* 播放中 hero 条底部收敛 */
-  --color-eq: oklch(70% 0.15 220);                   /* 正在播放 EQ 动画点 */
+  --color-eq: rgb(0,178,222);                   /* 正在播放 EQ 动画点 */
 }

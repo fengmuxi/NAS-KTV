@@ -43,7 +43,7 @@ const css = `
   transition: background-color 150ms var(--ease-out);
 }
 .server-item:hover {
-  background-color: oklch(from var(--color-paper-2) l c h / 0.8);
+  background-color: rgba(15,23,31,0.8);
 }
 `;
 
@@ -76,18 +76,23 @@ export default function Setup() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // 将任意 CSS 颜色值转为 hex（兼容 OKLCH/RGB/HSL 等现代格式）
+  // 注意：旧 Android WebView 的 Canvas 不支持 OKLCH 等现代颜色语法，
+  // fillStyle 赋值会静默失败（不抛错但 getImageData 返回初始透明黑 0,0,0,0）。
+  // 因此失败时返回空字符串，让调用方的 || fallback 生效。
   function cssColorToHex(cssColor: string): string {
-    if (!cssColor || cssColor.startsWith('#')) return cssColor || '#000000';
+    if (!cssColor || cssColor.startsWith('#')) return cssColor || '';
     try {
       const c = document.createElement('canvas');
       c.width = c.height = 1;
       const ctx = c.getContext('2d')!;
       ctx.fillStyle = cssColor;
       ctx.fillRect(0, 0, 1, 1);
-      const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+      const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+      // alpha=0 或 r=g=b=0 说明颜色未被正确解析（Canvas 不支持该格式）
+      if (a === 0 || (r === 0 && g === 0 && b === 0)) return '';
       return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
     } catch {
-      return '#000000';
+      return '';
     }
   }
 
@@ -375,7 +380,7 @@ export default function Setup() {
               <span className="min-w-0">手动配置</span>
             </h2>
 
-            <p className="text-ink-3 text-xs leading-relaxed shrink-0 break-words">
+            <p className="text-ink-3 text-[11px] leading-snug shrink-0 break-words">
               浏览器调试或无法扫码时，直接输入后端地址（如
               <span className="font-mono text-ink-2 break-all"> http://192.168.1.100:8080</span>）。
             </p>

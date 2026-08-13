@@ -38,7 +38,7 @@ export default function AdvancedControlsPanel({
       <div
         onClick={onClose}
         aria-hidden="true"
-        className={`fixed inset-0 bg-[color-mix(in_oklch,var(--color-black)_50%,transparent)] transition-opacity ease-out duration-base motion-reduce:transition-none ${
+        className={`fixed inset-0 bg-[rgba(0,0,0,0.5)] transition-opacity ease-out duration-base motion-reduce:transition-none ${
           open ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
       />

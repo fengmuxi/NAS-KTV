@@ -26,16 +26,16 @@ const css = `
   height: 100vh;
   overflow: hidden;
   background: linear-gradient(180deg,
-    oklch(8% 0.02 250) 0%,
-    oklch(12% 0.03 260) 50%,
-    oklch(6% 0.01 240) 100%
+    rgb(0,2,5) 0%,
+    rgb(2,5,17) 50%,
+    rgb(0,1,2) 100%
   );
 }
 
 /* MV 视频层 */
 .np-video-full {
   position: absolute;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
   width: 100%;
   height: 100%;
   object-fit: contain;
@@ -98,7 +98,7 @@ const css = `
   font-size: var(--text-sm);
   letter-spacing: var(--tracking-widest);
   text-transform: uppercase;
-  color: oklch(60% 0.08 250);
+  color: rgb(91,132,174);
   margin-bottom: var(--space-md);
 }
 
@@ -112,14 +112,14 @@ const css = `
   display: flex;
   align-items: baseline;
   gap: var(--space-md);
-  color: oklch(55% 0.06 240);
+  color: rgb(81,119,145);
   font-size: var(--text-base);
 }
 
 .np-queue-item-num {
   font-family: var(--font-mono);
   font-size: var(--text-sm);
-  color: oklch(50% 0.05 230);
+  color: rgb(69,105,122);
   min-width: 2ch;
 }
 
@@ -133,11 +133,11 @@ const css = `
   margin-left: auto;
   flex-shrink: 0;
   font-size: var(--text-xs);
-  color: oklch(48% 0.05 230);
+  color: rgb(63,99,117);
 }
 
 .np-queue-empty {
-  color: oklch(45% 0.04 230);
+  color: rgb(62,90,103);
   font-size: var(--text-sm);
 }
 
@@ -149,7 +149,7 @@ const css = `
   font-family: var(--font-body);
   font-size: var(--text-base);
   font-weight: 500;
-  color: oklch(65% 0.1 220);
+  color: rgb(56,157,185);
   text-shadow: var(--shadow-lyrics);
   margin-top: var(--space-sm);
 }
@@ -157,13 +157,13 @@ const css = `
 .np-song-requester-icon {
   width: 14px;
   height: 14px;
-  color: oklch(60% 0.1 220);
+  color: rgb(35,142,169);
 }
 
 /* 中间视觉化区域 */
 .np-visualizer {
   position: absolute;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
   z-index: 5;
   display: flex;
   align-items: center;
@@ -186,12 +186,12 @@ const css = `
   width: 200px;
   height: 200px;
   border-radius: var(--radius-full);
-  background-color: oklch(20% 0.02 250 / 0.7);
+  background-color: rgba(15,23,31,0.7);
   backdrop-filter: blur(20px) saturate(150%);
   box-shadow:
-    0 0 40px oklch(40% 0.1 250 / 0.3),
-    inset 0 0 20px oklch(30% 0.08 240 / 0.2);
-  color: oklch(70% 0.15 200);
+    0 0 40px rgba(18,74,123,0.3),
+    inset 0 0 20px rgba(0,49,81,0.2);
+  color: rgb(0,185,195);
   pointer-events: none;
   animation: np-pause-in var(--dur-base) var(--ease-out) both;
 }
@@ -202,7 +202,7 @@ const css = `
   font-size: var(--text-xs);
   font-weight: 600;
   line-height: 1.4;
-  color: oklch(65% 0.1 220);
+  color: rgb(56,157,185);
   text-align: center;
   overflow-wrap: anywhere;
 }
@@ -220,14 +220,14 @@ const css = `
 }
 
 .np-lyrics-area .lyric-line.current {
-  color: oklch(90% 0.12 200);
+  color: rgb(108,246,253);
   text-shadow:
-    0 0 15px oklch(75% 0.18 200),
-    0 0 30px oklch(65% 0.12 220);
+    0 0 15px rgb(0,205,218),
+    0 0 30px rgb(0,159,193);
 }
 
 .np-lyrics-area .lyric-line:not(.current) {
-  color: oklch(50% 0.06 240);
+  color: rgb(66,104,130);
 }
 
 /* 底部播放进度条（仅音频模式） */
@@ -241,12 +241,12 @@ const css = `
   border-radius: var(--radius-lg);
   background: linear-gradient(
     180deg,
-    oklch(12% 0.02 250 / 0.5) 0%,
-    oklch(8% 0.015 250 / 0.72) 100%
+    rgba(2,6,13,0.5) 0%,
+    rgba(0,2,4,0.72) 100%
   );
   backdrop-filter: blur(14px) saturate(120%);
-  border: 1px solid oklch(60% 0.08 250 / 0.16);
-  box-shadow: 0 8px 32px oklch(0% 0 0 / 0.35);
+  border: 1px solid rgba(91,132,174,0.16);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.35);
 }
 
 /* 大号时间显示：当前播放时间（主）+ 总时长（辅） */
@@ -263,8 +263,8 @@ const css = `
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.06em;
-  color: oklch(90% 0.1 200);
-  text-shadow: 0 0 14px oklch(70% 0.18 200 / 0.55);
+  color: rgb(135,242,248);
+  text-shadow: 0 0 14px rgba(0,189,202,0.55);
 }
 
 .np-progress-time-total {
@@ -272,7 +272,7 @@ const css = `
   font-size: 16px;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.04em;
-  color: oklch(60% 0.06 240);
+  color: rgb(95,133,161);
 }
 `;
 
@@ -392,9 +392,9 @@ export default function NowPlaying() {
   const qrBadge = qrText ? (
     <div className="qr-badge fixed top-2xl right-2xl z-40 flex flex-row items-center gap-lg rounded-xl p-md shadow-lg"
       style={{
-        background: 'linear-gradient(135deg, oklch(15% 0.02 250 / 0.85) 0%, oklch(10% 0.01 240 / 0.65) 100%)',
-        border: '2px solid oklch(70% 0.15 220 / 0.55)',
-        boxShadow: '0 0 30px oklch(70% 0.15 220 / 0.35), inset 0 0 12px oklch(70% 0.15 220 / 0.12)'
+        background: 'linear-gradient(135deg, rgba(5,12,19,0.85) 0%, rgba(2,4,5,0.65) 100%)',
+        border: '2px solid rgba(0,178,222,0.55)',
+        boxShadow: '0 0 30px rgba(0,178,222,0.35), inset 0 0 12px rgba(0,178,222,0.12)'
       }}>
       {/* 点歌二维码 */}
       <div className="flex flex-col items-center gap-sm">
@@ -421,7 +421,7 @@ export default function NowPlaying() {
       </div>
 
       {/* 垂直分隔线 */}
-      <div className="self-stretch w-px min-h-[88px]" style={{ background: 'oklch(70% 0.15 220 / 0.25)' }} />
+      <div className="self-stretch w-px min-h-[88px]" style={{ background: 'rgba(0,178,222,0.25)' }} />
 
       {/* 配置二维码 */}
       <div className="flex flex-col items-center gap-sm">
