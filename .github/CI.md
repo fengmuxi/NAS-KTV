@@ -57,7 +57,7 @@
 | 变量 | 出现位置 | 说明 |
 |------|---------|------|
 | `CI=true` | desktop.yml / android.yml | 告诉 Tauri 不要弹出开发窗口 |
-| `NDK_HOME` / `ANDROID_NDK_HOME` | android.yml | 安装 NDK 26 后写入，供 cargo 交叉编译 |
+| `NDK_HOME` / `ANDROID_NDK_HOME` | android.yml | 安装 NDK 26 + **`platforms;android-36`** 后写入，供 cargo 交叉编译。⚠️ `platforms;android-36` 必须与 `src-tauri/gen/android/app/build.gradle.kts` 的 `compileSdk=36`/`targetSdk=36` 一致，否则 gradle 配置阶段报 “Failed to find Platform android-36” → `tauri build` exit code 2 |
 | Docker 镜像 `tags` / `labels` | docker.yml | 由 `docker/metadata-action` 依据 semver 自动生成 |
 
 ---

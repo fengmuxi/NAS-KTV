@@ -60,7 +60,10 @@ jobs:
 
       - name: Install NDK + build-tools
         run: |
-          sdkmanager "ndk;26.1.10909125" "platforms;android-34" "build-tools;34.0.0"
+          # 注意：platforms 版本必须与 src-tauri/gen/android/app/build.gradle.kts 的
+          # compileSdk(=36) / targetSdk(=36) 一致，否则 gradle 配置阶段报
+          # "Failed to find Platform android-36" 导致 tauri build exit code 2。
+          sdkmanager "ndk;26.1.10909125" "platforms;android-36" "build-tools;34.0.0"
           echo "NDK_HOME=$ANDROID_HOME/ndk/26.1.10909125" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/26.1.10909125" >> "$GITHUB_ENV"
 
@@ -79,6 +82,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CI: true
+          # cargo-ndk 需要 NDK major version 来确定 ABI / 链接方式
+          CARGO_NDK_VERSION: 26
         with:
           projectPath: packages/tv-app
           includeAndroid: true
@@ -91,10 +96,11 @@ jobs:
 
       - name: Upload to Release
         if: ${{ inputs.tag != '' }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ inputs.tag }}
-          files: nasktv-tv-${{ matrix.arch }}.apk
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: gh release upload "$TAG" "nasktv-tv-${{ matrix.arch }}.apk" --clobber --repo "${{ github.repository }}"
 
       - name: Upload artifact
         if: always()

@@ -88,8 +88,19 @@ jobs:
 
       - name: Upload to Release
         if: ${{ inputs.tag != '' }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ inputs.tag }}
-          files: |
-            packages/tv-app/src-tauri/target/**/release/bundle/**/*
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          # 用 gh release upload --clobber 替换 softprops/action-gh-release：
+          # 后者在重跑同一 tag 时删除已存在 asset 会报 "Not found"（delete-a-release-asset），
+          # 且 glob 展开由本步用 find 控制，行为更可控。
+          mapfile -t FILES < <(find packages/tv-app/src-tauri/target -path '*/release/bundle/*' -type f)
+          if [ ${#FILES[@]} -eq 0 ]; then
+            echo "::error::未发现桌面端构建产物 (target/**/release/bundle/**)"
+            exit 1
+          fi
+          printf '上传 %d 个产物:\n' "${#FILES[@]}"
+          printf '  %s\n' "${FILES[@]}"
+          gh release upload "$TAG" "${FILES[@]}" --clobber --repo "${{ github.repository }}"
