@@ -62,9 +62,21 @@ jobs:
             echo "::error::tag_name 输出为空，无法触发 release.yml"
             exit 1
           fi
-          echo "::notice::通过 workflow_dispatch 触发 release.yml (tag=${TAG})"
-          gh workflow run release.yml -f tag="$TAG" 2>&1 || {
-            echo "::error::gh workflow run 失败 (exit code: $?)"
+
+          # 先确认 workflow 文件存在
+          echo "--- 查找 release.yml ---"
+          gh workflow list --json name,state,path 2>&1 || true
+          echo ""
+
+          WF=".github/workflows/release.yml"
+          echo "::notice::通过 workflow_dispatch 触发 ${WF} (tag=${TAG})"
+          gh workflow run "${WF}" -f tag="$TAG" 2>&1
+          RC=$?
+          if [ $RC -ne 0 ]; then
+            echo "::error::gh workflow run 失败 (exit code: ${RC})"
+            # 尝试用 workflow 名（不含路径）作为备选
+            echo "--- 尝试备选：用 workflow 名 ---"
+            gh workflow run "release.yml" -f tag="$TAG" 2>&1 || true
             exit 1
-          }
+          fi
           echo "✅ dispatch 成功"
