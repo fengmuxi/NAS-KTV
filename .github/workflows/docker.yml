@@ -94,6 +94,11 @@ jobs:
           file: ${{ matrix.dockerfile }}
           platforms: linux/amd64,linux/arm64
           push: true
+          # ACR 不兼容 buildx 默认的 provenance/SBOM attestation 空清单
+          # (application/vnd.oci.empty.v1+json)，会导致推送报
+          # "denied: unknown manifest class"。关闭后回退为标准 docker manifest v2。
+          provenance: false
+          sbom: false
           tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
