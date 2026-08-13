@@ -12,6 +12,9 @@ export default defineConfig({
   plugins: [react()],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
+    // 旧 Android WebView（Chrome < 71）不支持 globalThis，会导致部分 CJS 库（qrcode
+    // 等）抛 ReferenceError。构建期把 globalThis 替换为 window（永远可用）。
+    globalThis: 'window',
   },
   // Tauri 不支持相对路径，需要相对根
   base: '/',
