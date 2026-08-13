@@ -2,9 +2,11 @@
  * states: static (no interactive elements) · contrast: pass (≥7:1 for 10-foot UI)
  */
 import { useRoomStore } from '../stores/room';
+import client from '../api/client';
 
-// Logo 地址：与 API client 保持一致（生产可用 VITE_API_BASE_URL 覆盖）
-const LOGO_URL = `${import.meta.env.VITE_API_BASE_URL || '/api'}/logo`;
+// Logo 地址：用运行时 baseURL（setApiBaseUrl 已在 bootstrap 设置），
+// 不再用构建时 VITE_API_BASE_URL —— 打包的 Tauri 应用不自带构建时地址。
+const logoUrl = () => `${(client.defaults.baseURL || '/api').replace(/\/+$/, '')}/logo`;
 
 const css = `
 /* 未授权状态点脉冲（opacity 动画，reduced-motion 关闭） */
@@ -31,7 +33,7 @@ export default function Unauthorized() {
       <header className="flex items-center justify-between">
         <span className="flex items-center gap-sm font-display text-lg text-ink-3 tracking-wide">
           <img
-            src={LOGO_URL}
+            src={logoUrl()}
             alt=""
             className="w-6 h-6 rounded-md object-cover"
           />

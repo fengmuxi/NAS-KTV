@@ -17,23 +17,46 @@ export async function getDeviceId(): Promise<string> {
     return getDeviceIdFromLocalStorage();
   }
 
-  // Tauri 环境：用文件系统持久化
+  // Tauri 环境：文件为主、localStorage 为兜底（与 backend-config.ts 双写模式对齐）。
+  // 之前只读文件，一旦文件读写因 scope/权限静默失败，每次启动都生成新 UUID。
   const dataDir = await appDataDir();
   const filePath = await join(dataDir, DEVICE_ID_FILE);
 
+  // 1) 优先读文件
   try {
     if (await exists(filePath)) {
-      return await readTextFile(filePath);
+      const id = (await readTextFile(filePath)).trim();
+      if (id) {
+        // 同步回写 localStorage（文件可读不代表后续可写，提前备份）
+        try {
+          localStorage.setItem(DEVICE_ID_STORAGE_KEY, id);
+        } catch {}
+        return id;
+      }
     }
   } catch (e) {
-    // 文件不存在或读取失败，继续生成新 ID
+    // 文件不存在或读取失败，继续尝试 localStorage
   }
 
-  // 生成新 UUID v4
+  // 2) 回退读 localStorage（文件不可读时的备份）
+  try {
+    const lsId = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+    if (lsId) {
+      // 尝试回写文件（可能仍失败，但不影响本次返回）
+      try {
+        await mkdir(dataDir, { recursive: true });
+        await writeTextFile(filePath, lsId);
+      } catch {}
+      return lsId;
+    }
+  } catch (e) {
+    // localStorage 不可用，继续生成新 ID
+  }
+
+  // 3) 都没有，生成新 UUID，双写持久化
   const deviceId = generateUUID();
 
   try {
-    // 确保目录存在
     try {
       await mkdir(dataDir, { recursive: true });
     } catch (e) {
@@ -41,7 +64,12 @@ export async function getDeviceId(): Promise<string> {
     }
     await writeTextFile(filePath, deviceId);
   } catch (e) {
-    console.error('Failed to persist device ID:', e);
+    console.error('Failed to persist device ID to file:', e);
+  }
+  try {
+    localStorage.setItem(DEVICE_ID_STORAGE_KEY, deviceId);
+  } catch (e) {
+    console.error('Failed to persist device ID to localStorage:', e);
   }
 
   return deviceId;
@@ -59,7 +87,7 @@ export async function clearDeviceId(): Promise<void> {
     return;
   }
 
-  // Tauri 环境：删除文件
+  // Tauri 环境：同时清除文件和 localStorage（与 getDeviceId 双写对称）
   try {
     const dataDir = await appDataDir();
     const filePath = await join(dataDir, DEVICE_ID_FILE);
@@ -67,7 +95,12 @@ export async function clearDeviceId(): Promise<void> {
       await remove(filePath);
     }
   } catch (e) {
-    console.error('Failed to clear device ID:', e);
+    console.error('Failed to clear device ID file:', e);
+  }
+  try {
+    localStorage.removeItem(DEVICE_ID_STORAGE_KEY);
+  } catch (e) {
+    console.error('Failed to clear device ID from localStorage:', e);
   }
 }
 

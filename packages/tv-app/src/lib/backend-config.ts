@@ -20,7 +20,11 @@ function deriveWsUrl(apiUrl: string): string {
 }
 
 /**
- * 读取后端配置。优先级：运行时持久化配置 > 构建时 VITE_API_BASE_URL / VITE_WS_BASE_URL
+ * 读取后端配置。优先级：
+ * - Tauri 环境：运行时持久化配置（文件 > localStorage），无则返回 null（进 Setup 页）。
+ *   不回退到构建时 VITE_API_BASE_URL —— 打包的桌面/Android 应用必须经过设置页
+ *   显式配置后端地址，避免开发环境变量泄漏到生产包。
+ * - 浏览器环境：localStorage > 构建时 VITE_API_BASE_URL（浏览器开发 / 反代部署模式）
  * 返回 null 表示两者都无（首次使用，进入设置页）
  */
 export async function loadBackendConfig(): Promise<BackendConfig | null> {
@@ -48,16 +52,19 @@ export async function loadBackendConfig(): Promise<BackendConfig | null> {
     } catch (e) {
       console.error('Failed to load backend config from localStorage:', e);
     }
-  } else {
-    try {
-      const raw = localStorage.getItem(CONFIG_STORAGE_KEY);
-      if (raw) {
-        const cfg = JSON.parse(raw) as BackendConfig;
-        if (cfg?.apiUrl) return cfg;
-      }
-    } catch (e) {
-      console.error('Failed to load backend config from localStorage:', e);
+    // Tauri 模式：无运行时配置就返回 null，强制进 Setup 页（不回退构建时变量）
+    return null;
+  }
+
+  // 浏览器环境：localStorage > 构建时 VITE_API_BASE_URL
+  try {
+    const raw = localStorage.getItem(CONFIG_STORAGE_KEY);
+    if (raw) {
+      const cfg = JSON.parse(raw) as BackendConfig;
+      if (cfg?.apiUrl) return cfg;
     }
+  } catch (e) {
+    console.error('Failed to load backend config from localStorage:', e);
   }
 
   // 兜底：构建时配置（浏览器开发 / 反代部署模式）
