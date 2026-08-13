@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.1](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.0...v0.3.1) (2026-08-13)
+
+
+### Bug Fixes
+
+* **build:** 移除前端包 prebuild 修复 web Docker 构建，版本同步至 0.3.0 ([b2bdf1c](https://github.com/fengmuxi/NAS-KTV/commit/b2bdf1c56a30f3951278f2fdda91dbbcd1a6a6f1))
+* **ci:** 关闭 buildx provenance/SBOM 以兼容阿里云 ACR 推送 ([00dc75a](https://github.com/fengmuxi/NAS-KTV/commit/00dc75aabc5f592e48b3788b518f5224c2f31699))
+* **separator:** Docker 不再预装 torch/demucs，改由运行时后台安装 ([78219df](https://github.com/fengmuxi/NAS-KTV/commit/78219df64f74c05819b80c2c44f4878109ba0706))
+
 ## [0.3.0](https://github.com/fengmuxi/NAS-KTV/compare/v0.2.1...v0.3.0) (2026-08-13)
 
 
