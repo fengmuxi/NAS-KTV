@@ -39,12 +39,20 @@ jobs:
           # workflow_dispatch 兜底触发。两条路径互斥，不会重复构建。
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
 
-      # 兜底触发：本次确实发布了 Release、且未配置 PAT（避免与 release:published 重复触发）时，
-      # 用 gh 显式调用 release.yml 的 workflow_dispatch。workflow_dispatch 是 GitHub 官方推荐的跨
-      # workflow 触发方式，不受 GITHUB_TOKEN 反递归限制，因此无需配置 RELEASE_PLEASE_TOKEN 也能触发构建。
+      # 兜底触发：本次确实发布了 Release 时，用 gh 显式调用 release.yml 的 workflow_dispatch。
+      # workflow_dispatch 是 GitHub 官方推荐的跨 workflow 触发方式，不受 GITHUB_TOKEN 反递归限制。
+      # 注意：if 表达式不能直接引用 secrets 上下文（GitHub 限制），所以 secrets 判断放在 run 脚本内部。
       - name: Trigger release build (workflow_dispatch fallback)
-        if: ${{ steps.release.outputs.release_created && secrets.RELEASE_PLEASE_TOKEN == '' }}
+        if: ${{ steps.release.outputs.release_created }}
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag_name }}
-        run: gh workflow run release.yml -f tag="$TAG"
+          # 将「是否配置了 PAT」传入脚本；空字符串 = 未配置
+          HAS_PAT: ${{ secrets.RELEASE_PLEASE_TOKEN != '' && 'true' || 'false' }}
+        run: |
+          if [ "$HAS_PAT" = "true" ]; then
+            echo "::notice::RELEASE_PLEASE_TOKEN 已配置，release:published 将自动触发 release.yml，跳过 dispatch"
+          else
+            echo "::notice::未配置 RELEASE_PLEASE_TOKEN，通过 workflow_dispatch 兜底触发 release.yml"
+            gh workflow run release.yml -f tag="$TAG"
+          fi
