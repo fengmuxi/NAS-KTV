@@ -52,12 +52,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Sync version to tag
-        if: ${{ inputs.tag != '' }}
+      - name: Sync version
         shell: bash
         env:
           TAG: ${{ inputs.tag }}
-        run: node scripts/set-version.mjs "${TAG#v}"
+        run: |
+          # 有 tag 用 tag 版本（精确匹配 Release），无 tag 从 manifest 同步
+          # （release-please 每次 Release PR 合并后 manifest 已 bump 并提交到 main）
+          if [ -n "$TAG" ]; then
+            node scripts/set-version.mjs "${TAG#v}"
+          else
+            node scripts/set-version.mjs
+          fi
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
