@@ -77,17 +77,23 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: node scripts/set-version.mjs "${TAG#v}"
 
-      - name: Build APK with tauri-action
-        uses: tauri-apps/tauri-action@v0
+      - name: Build APK
+        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CI: true
           # cargo-ndk 需要 NDK major version 来确定 ABI / 链接方式
           CARGO_NDK_VERSION: 26
-        with:
-          projectPath: packages/tv-app
-          includeAndroid: true
-          args: --target ${{ matrix.target }} --apk
+        run: |
+          # 直接调用 tauri CLI 的 android build 子命令。
+          # 不用 tauri-action 的 includeAndroid + args 转发：它最终会把命令拼成
+          # `tauri build -- --target <triple> --apk`（桌面模式），而 --apk 在
+          # 桌面模式下是非法参数，导致 exit code 2。
+          # 命令与 AGENTS.md 一致：pnpm exec tauri android build --target <triple> --apk
+          # （packages/tv-app 的 package.json 有 "tauri": "tauri" 脚本，
+          #  用 pnpm exec 直接调二进制可避免经 npm 脚本错拼子命令。）
+          cd packages/tv-app
+          pnpm exec tauri android build --target ${{ matrix.target }} --apk
 
       - name: Prepare APK
         run: |
