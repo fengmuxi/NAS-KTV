@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.1...v0.3.2) (2026-08-13)
+
+
+### Bug Fixes
+
+* **ci:** release-please 改用 PAT 以触发下游 release.yml 构建 ([cd40e2f](https://github.com/fengmuxi/NAS-KTV/commit/cd40e2f2db6c67289503b30d37ebcfff1cb8eea5))
+
 ## [0.3.1](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.0...v0.3.1) (2026-08-13)
 
 
