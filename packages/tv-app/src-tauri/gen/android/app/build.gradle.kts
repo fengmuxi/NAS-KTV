@@ -37,6 +37,12 @@ android {
             }
         }
         getByName("release") {
+            // CI 必须签名 release（否则装不上：`INSTALL_PARSE_FAILED_NO_CERTIFICATES`）。
+            // 这里复用 debug signingConfig（AGP 自动用 ~/.android/debug.keystore），
+            // CI 步骤会用 keytool 提前生成该 keystore。
+            // 本地开发者执行过一次 Android 构建（Android Studio 或 gradle）也会自动创建。
+            // 上架正式 release 时换成真实 release keystore（参考 signingConfigs.create("release")）。
+            signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = true
             proguardFiles(
                 *fileTree(".") { include("**/*.pro") }

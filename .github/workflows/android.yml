@@ -101,10 +101,32 @@ jobs:
           # 不接受 Rust/NDK 三元组（aarch64-linux-android）。
           pnpm exec tauri android build --target ${{ matrix.tauriTarget }} --apk
 
+      # 为 release APK 生成 debug keystore（~/.android/debug.keystore）。
+      # gradle 的 release buildType 已配置 signingConfig = debug（见 build.gradle.kts），
+      # 自动引用此 keystore。若不预先存在，gradle 签名步骤会失败。
+      - name: Generate debug keystore
+        run: |
+          mkdir -p ~/.android
+          if [ ! -f ~/.android/debug.keystore ]; then
+            keytool -genkeypair \
+              -keystore ~/.android/debug.keystore \
+              -storepass android -keypass android \
+              -alias androiddebugkey \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=NASKTV CI, O=NASKTV, C=CN"
+          fi
+          echo "✅ debug keystore ready: $(ls -la ~/.android/debug.keystore)"
+
       - name: Prepare APK
         run: |
-          UNSIGNED=$(find packages/tv-app/src-tauri/gen/android -name '*-unsigned.apk' | head -n1)
-          cp "$UNSIGNED" "nasktv-tv-${{ matrix.arch }}.apk"
+          # gradle 签名后产出 app-release.apk（不再是 *-unsigned.apk）。
+          APK=$(find packages/tv-app/src-tauri/gen/android -name '*-release.apk' | head -n1)
+          if [ -z "$APK" ]; then
+            echo "::error::未找到签名后的 release APK (gen/android/.../build/outputs/apk/release/*.apk)"
+            exit 1
+          fi
+          cp "$APK" "nasktv-tv-${{ matrix.arch }}.apk"
+          echo "✅ prepared: $(ls -la nasktv-tv-${{ matrix.arch }}.apk)"
 
       - name: Upload to Release
         if: ${{ inputs.tag != '' }}
