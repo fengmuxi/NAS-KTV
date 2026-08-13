@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.12](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.11...v0.3.12) (2026-08-13)
+
+
+### Bug Fixes
+
+* **tv-app:** 用入口 polyfill 替代 globalThis 暴力替换修复旧 WebView ([1e20525](https://github.com/fengmuxi/NAS-KTV/commit/1e205253d8bc541f34a274b0639d14eaa933957f))
+
 ## [0.3.11](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.10...v0.3.11) (2026-08-13)
 
 
