@@ -16,7 +16,7 @@
   "engines": {
     "node": ">=18"
   },
-  "packageManager": "pnpm@8.1.1+sha1.f3d2cd2bddf0fa447a13b80e166d1b85a7823486",
+  "packageManager": "pnpm@9.0.0",
   "volta": {
     "node": "20.10.0"
   }

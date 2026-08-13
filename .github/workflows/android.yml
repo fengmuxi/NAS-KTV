@@ -36,8 +36,7 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
+        # 版本由根 package.json 的 packageManager（pnpm@9.0.0，与 lockfileVersion 9.0 一致）单一来源决定
 
       - name: Setup Node
         uses: actions/setup-node@v4
