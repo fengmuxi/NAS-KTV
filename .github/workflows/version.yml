@@ -28,7 +28,15 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    # release-please-action@v4 在 Node 24 下调用 GitHub REST API 时偶发
+    # "response: undefined" 错误（Fetch merge commits 失败），显式锁定 Node 20 避免。
+    strategy:
+      matrix:
+        node-version: [20]
     steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
       - uses: googleapis/release-please-action@v4
         id: release
         with:

@@ -20,16 +20,35 @@
 
 路径：**仓库 Settings → Secrets and variables → Actions → Secrets → New repository secret**
 
-当前版本**只有这 4 个手动密钥**（签名移除后，不再需要任何 Windows / macOS / Android 签名密钥）：
+当前版本**有这 5 个手动密钥**（签名移除后，不再需要任何 Windows / macOS / Android 签名密钥）：
 
 | Secret 名称 | 必填 | 说明 | 示例 |
 |------|------|------|------|
+| `RELEASE_PLEASE_TOKEN` | ⚠️ 强烈建议 | 具备 `contents:write` + `pull-requests:write` + `actions:write` 权限的 **PAT（个人访问令牌）**。用于 `version.yml` 的 release-please 创建 Release/PR，使 `release: published` 能链式触发 `release.yml` 自动构建产物 | `ghp_xxx` 或 fine-grained `github_pat_xxx` |
 | `ALIYUN_ACR_REGISTRY` | ✅ | 阿里云容器镜像服务（ACR）注册地址 | `registry.cn-hangzhou.aliyuncs.com` |
 | `ALIYUN_ACR_USERNAME` | ✅ | ACR 登录用户名（通常用 RAM 子账号的 AccessKeyId） | `your-ram-access-key-id` |
 | `ALIYUN_ACR_PASSWORD` | ✅ | ACR 登录密码（RAM AccessKeySecret） | `your-ram-access-key-secret` |
 | `ALIYUN_ACR_NAMESPACE` | ✅ | 镜像命名空间（仓库名） | `nasktv` |
 
-**未配置的后果**：`docker.yml` 的登录/推送步骤会失败，镜像不会发布；但桌面端、安卓端构建不受影响（可单独出包）。
+### RELEASE_PLEASE_TOKEN 配置步骤
+
+1. **生成 PAT**
+   - Classic PAT：GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token，勾选 `repo`（含 `public_repo`）、`workflow` 也可一并勾上
+   - 或 Fine-grained PAT：勾选该仓库的 `Contents: read & write`、`Pull requests: read & write`、`Actions: read & write`
+2. **添加到 Secrets**：仓库 Settings → Secrets and variables → Actions → Secrets → New repository secret，Name 填 `RELEASE_PLEASE_TOKEN`，Secret 粘贴刚生成的令牌
+3. **验证**：下次 `version.yml` 运行日志里出现 `::notice::RELEASE_PLEASE_TOKEN 已配置，release:published 将自动触发 release.yml` 即生效
+
+### 未配置 RELEASE_PLEASE_TOKEN 的影响
+
+`version.yml` 中 `token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}` 会回退到默认 `GITHUB_TOKEN`。**GitHub 限制：GITHUB_TOKEN 创建的 Release 不会触发下游 `release.yml`**（`release: published` 不反递归触发）。此时：
+
+- `version.yml` 仍能正常开 Release PR、合并后打 tag + 建 Release（动作本身允许）；
+- 但 `release.yml` 不会自动运行，**桌面端 / 安卓端 / Docker 产物不会发布**；
+- 需在 Actions 页面手动 `workflow_dispatch` 触发 `release.yml`（传对应 tag）兜底出包。
+
+> 因此该 Secret 虽标「建议」而非「必填」，但**要让发版全自动闭环，必须配置**。
+
+**未配置 ACR 密钥的后果**：`docker.yml` 的登录/推送步骤会失败，镜像不会发布；但桌面端、安卓端构建不受影响（可单独出包）。
 
 **镜像推送地址**（三个元件推到同一个镜像仓库 `nasktv`，用 tag 前缀区分）：
 ```
@@ -45,7 +64,7 @@
 
 | 变量 | 来源 | 用途 |
 |------|------|------|
-| `GITHUB_TOKEN` | GitHub 自动注入 | release-please 开 PR/打 tag、tauri-action 与 action-gh-release 上传产物。权限由各 workflow 的 `permissions:` 块控制（需 `contents: write` + `pull-requests: write`，见仓库 Settings → Actions → General → Workflow permissions 设为 Read and write） |
+| `GITHUB_TOKEN` | GitHub 自动注入 | release-please 开 PR/打 tag、tauri-action 与 action-gh-release 上传产物。权限由各 workflow 的 `permissions:` 块控制（`version.yml` 需 `contents: write` + `pull-requests: write` + `actions: write`，其余工作流需 `contents: write` + `pull-requests: write`；见仓库 Settings → Actions → General → Workflow permissions 设为 Read and write） |
 | `GITHUB_REF_NAME` | GitHub 自动注入 | 当前 tag 名（如 `v0.2.0`），被 `scripts/set-version.mjs` 用于统一各包版本号 |
 
 ---
