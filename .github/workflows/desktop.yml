@@ -102,10 +102,15 @@ jobs:
           # Tauri v2 产出：
           #   Windows: bundle/nsis/*.exe（NSIS 安装包）、bundle/msi/*.msi
           #   macOS:   bundle/macos/*.tar.gz / *.dmg / *.app.zip
-          mapfile -t FILES < <(find packages/tv-app/src-tauri/target \
+          # macOS runner 自带 Bash 3.2 无 mapfile，改用 POSIX 兼容的 NUL 分隔 read 循环
+          # （find -print0 + IFS= read -r -d ''），对空格/换行安全，且 macOS/Linux 通用。
+          FILES=()
+          while IFS= read -r -d '' f; do
+            FILES+=("$f")
+          done < <(find packages/tv-app/src-tauri/target \
             -path '*/release/bundle/*' \
             \( -name '*.exe' -o -name '*.msi' -o -name '*.tar.gz' -o -name '*.dmg' -o -name '*.app.zip' \) \
-            -type f)
+            -type f -print0)
           if [ ${#FILES[@]} -eq 0 ]; then
             echo "::error::未发现桌面端安装包 (.exe/.msi/.tar.gz/.dmg/.app.zip)"
             exit 1
