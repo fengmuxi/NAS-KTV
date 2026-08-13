@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.0](https://github.com/fengmuxi/NAS-KTV/compare/v0.2.1...v0.3.0) (2026-08-13)
+
+
+### Features
+
+* separator PyTorch 后台自动安装与安装状态监控 ([e6b9088](https://github.com/fengmuxi/NAS-KTV/commit/e6b908887e9fa12532f68d22582cb0ad996fb900))
+
+
+### Bug Fixes
+
+* TV 播放器以 CORS 模式加载跨源音频以支持混音 ([0e7e4ee](https://github.com/fengmuxi/NAS-KTV/commit/0e7e4eeefb037a9cf3f0a1b1dbdd2d84fb873ee9))
+* TV 连接/授权页排版与二维码、自动扫描流程 ([11d63b8](https://github.com/fengmuxi/NAS-KTV/commit/11d63b8b819aa6a6fd251ca1528fda266d667c13))
+* 音频流接口放行跨源访问以支持 TV Web Audio 混音 ([b8d240c](https://github.com/fengmuxi/NAS-KTV/commit/b8d240ca26229ccd293d92314e3ee0bc1e58d37b))
+
 ## [0.2.1](https://github.com/fengmuxi/NAS-KTV/compare/v0.2.0...v0.2.1) (2026-08-11)
 
 
