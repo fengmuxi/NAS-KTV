@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.13](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.12...v0.3.13) (2026-08-13)
+
+
+### Bug Fixes
+
+* **tv-app:** 兼容旧 Android WebView（Chrome &lt; 71） ([9ca5a1b](https://github.com/fengmuxi/NAS-KTV/commit/9ca5a1b45dce57155ae8355fc455e4594bdd7a29))
+
 ## [0.3.12](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.11...v0.3.12) (2026-08-13)
 
 
