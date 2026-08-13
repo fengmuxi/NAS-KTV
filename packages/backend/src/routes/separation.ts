@@ -416,6 +416,19 @@ router.get(
 );
 
 /**
+ * 跨源音频流响应头
+ *
+ * TV 端通过 Web Audio API（createMediaElementSource）接入跨源音频做混音，浏览器要求
+ * 媒体「CORS 干净」且响应带 Cross-Origin-Resource-Policy，否则报
+ * ERR_BLOCKED_BY_RESPONSE.NotSameOrigin 并无法播放。音频路由为公开接口（无鉴权），
+ * 故显式放行跨源。
+ */
+const STREAM_CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Cross-Origin-Resource-Policy': 'cross-origin',
+};
+
+/**
  * 音频流辅助函数 - 支持 Range 请求
  *
  * 返回 true 表示已处理响应（成功或失败），false 表示文件不存在
@@ -496,6 +509,7 @@ function streamAudioFile(
       'Accept-Ranges': 'bytes',
       'Content-Length': chunkSize.toString(),
       'Content-Type': contentType,
+      ...STREAM_CORS_HEADERS,
     });
 
     stream.pipe(res);
@@ -513,6 +527,7 @@ function streamAudioFile(
     'Content-Length': fileSize.toString(),
     'Content-Type': contentType,
     'Accept-Ranges': 'bytes',
+    ...STREAM_CORS_HEADERS,
   });
 
   const stream = fs.createReadStream(resolvedPath);
