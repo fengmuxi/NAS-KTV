@@ -12,7 +12,8 @@
 #   <REGISTRY>/<NAMESPACE>/nasktv:backend-<semver>
 #   <REGISTRY>/<NAMESPACE>/nasktv:separator-<semver>
 #   <REGISTRY>/<NAMESPACE>/nasktv:web-<semver>
-# Each also gets a <service>-<major>.<minor> tag (e.g. backend-0.2).
+# Each also gets a <service>-<major>.<minor> tag (e.g. backend-0.2),
+# and — only on a real release (inputs.tag provided) — a <service>-latest tag.
 # Platform: linux/amd64 only — 部署目标为 x86（separator 配 NVIDIA GPU）。arm64 需 QEMU
 # 模拟，重 Node 构建（pnpm install / vite build）会触发 "Illegal instruction" 崩溃，故不构建。
 
@@ -74,6 +75,7 @@ jobs:
           REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
           NAMESPACE: ${{ secrets.ALIYUN_ACR_NAMESPACE }}
           TAG: ${{ inputs.tag || github.ref_name }}
+          INPUT_TAG: ${{ inputs.tag }}
         shell: bash
         run: |
           VER="${TAG#v}"
@@ -82,6 +84,10 @@ jobs:
             echo "tags<<EOF"
             echo "${BASE}:${{ matrix.name }}-${VER}"
             echo "${BASE}:${{ matrix.name }}-${VER%.*}"
+            # 真实发布（提供了 tag）时额外打 latest 标签，便于生产部署引用
+            if [ -n "${INPUT_TAG}" ]; then
+              echo "${BASE}:${{ matrix.name }}-latest"
+            fi
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
@@ -97,6 +103,10 @@ jobs:
           # "denied: unknown manifest class"。关闭后回退为标准 docker manifest v2。
           provenance: false
           sbom: false
+          # 前端构建期参数：web 镜像构建时注入；backend/separator 镜像虽不消费该参数，
+          # 但已在各自 Dockerfile 顶部声明 ARG，以消除 buildx "build arg 未消费" 告警。
+          build-args: |
+            VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL }}
           tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

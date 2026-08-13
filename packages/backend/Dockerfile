@@ -1,3 +1,7 @@
+# 声明 VITE_API_BASE_URL：docker.yml 通过 --build-arg 把它透传给所有镜像，
+# 本镜像虽不消费该参数，声明后可消除 buildx "build arg 未消费" 的告警。
+ARG VITE_API_BASE_URL
+
 FROM node:20-alpine AS base
 RUN npm install -g pnpm@9
 WORKDIR /app

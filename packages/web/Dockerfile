@@ -7,6 +7,10 @@ COPY packages/admin-web/package.json ./packages/admin-web/
 RUN pnpm install --frozen-lockfile --filter @nasktv/admin-web
 COPY tsconfig.base.json ./
 COPY packages/admin-web ./packages/admin-web/
+# 前端构建期参数：留空则前端用 `${window.location.origin}/api`（同源相对路径，配合 nginx 反代）；
+# 跨域部署（前端与后端不同源）时由 CI 通过 --build-arg 注入绝对地址。
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 RUN pnpm --filter @nasktv/admin-web build
 
 # Stage 2: build mobile-h5
@@ -20,6 +24,9 @@ RUN pnpm install --frozen-lockfile --filter @nasktv/mobile-h5...
 COPY tsconfig.base.json ./
 COPY packages/mobile-h5 ./packages/mobile-h5/
 COPY packages/shared ./packages/shared/
+# 同 admin-build：跨域部署时由 CI 注入 VITE_API_BASE_URL
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 RUN pnpm --filter @nasktv/mobile-h5 build
 
 # Stage 3: production with nginx（同时托管 admin-web + mobile-h5 + 反代 backend）

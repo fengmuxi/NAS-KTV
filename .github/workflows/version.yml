@@ -22,17 +22,29 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # 允许本 workflow 通过 gh 显式触发 release.yml（无 PAT 时的兜底触发，见下方步骤）
+  actions: write
 
 jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
       - uses: googleapis/release-please-action@v4
+        id: release
         with:
           config-file: .release-please-config.json
           manifest-file: .release-please-manifest.json
-          # 必须用 PAT（不能用默认 GITHUB_TOKEN）：release-please 用 GITHUB_TOKEN 创建的
-          # Release 不会触发下游 workflow（GitHub 限制），导致 release.yml 的
-          # `release: published` 永不自动触发、构建附件不发布。
-          # 未配置 RELEASE_PLEASE_TOKEN secret 时退回 GITHUB_TOKEN（不致报错，但不会自动触发构建）。
+          # 创建 Release / PR：配置了 RELEASE_PLEASE_TOKEN 时用 PAT（其创建的 release:published 能链式触发
+          # release.yml）；未配置时退回 GITHUB_TOKEN（创建动作本身允许，tag 正常生成），改由下方
+          # workflow_dispatch 兜底触发。两条路径互斥，不会重复构建。
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+
+      # 兜底触发：本次确实发布了 Release、且未配置 PAT（避免与 release:published 重复触发）时，
+      # 用 gh 显式调用 release.yml 的 workflow_dispatch。workflow_dispatch 是 GitHub 官方推荐的跨
+      # workflow 触发方式，不受 GITHUB_TOKEN 反递归限制，因此无需配置 RELEASE_PLEASE_TOKEN 也能触发构建。
+      - name: Trigger release build (workflow_dispatch fallback)
+        if: ${{ steps.release.outputs.release_created && secrets.RELEASE_PLEASE_TOKEN == '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag_name }}
+        run: gh workflow run release.yml -f tag="$TAG"
