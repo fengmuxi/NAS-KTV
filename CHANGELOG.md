@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.4](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.3...v0.3.4) (2026-08-13)
+
+
+### Bug Fixes
+
+* **ci:** 增加兜底触发步骤的调试输出和错误处理 ([b975d0e](https://github.com/fengmuxi/NAS-KTV/commit/b975d0e5eaaae86c7e17027a7051b6ac5c3dcdd1))
+
 ## [0.3.3](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.2...v0.3.3) (2026-08-13)
 
 
