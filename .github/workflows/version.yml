@@ -31,3 +31,8 @@ jobs:
         with:
           config-file: .release-please-config.json
           manifest-file: .release-please-manifest.json
+          # 必须用 PAT（不能用默认 GITHUB_TOKEN）：release-please 用 GITHUB_TOKEN 创建的
+          # Release 不会触发下游 workflow（GitHub 限制），导致 release.yml 的
+          # `release: published` 永不自动触发、构建附件不发布。
+          # 未配置 RELEASE_PLEASE_TOKEN secret 时退回 GITHUB_TOKEN（不致报错，但不会自动触发构建）。
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
