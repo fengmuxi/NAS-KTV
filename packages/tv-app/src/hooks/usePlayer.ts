@@ -286,6 +286,11 @@ export function usePlayer({
   useEffect(() => {
     const originalAudio = new Audio();
     const instrumentalAudio = new Audio();
+    // 跨源音频需以 CORS 模式加载，Web Audio（createMediaElementSource）才能读取采样混音；
+    // 必须在赋值 src 前设置，否则会触发重新加载。后端音频响应已带
+    // Access-Control-Allow-Origin / Cross-Origin-Resource-Policy 放行。
+    originalAudio.crossOrigin = 'anonymous';
+    instrumentalAudio.crossOrigin = 'anonymous';
     originalAudioRef.current = originalAudio;
     instrumentalAudioRef.current = instrumentalAudio;
 
