@@ -82,8 +82,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tv-desktop-${{ matrix.target }}
+          # 只上传最终安装包（与 Release 上传保持一致）
           path: |
-            packages/tv-app/src-tauri/target/**/release/bundle/**/*
+            packages/tv-app/src-tauri/target/**/release/bundle/nsis/*.exe
+            packages/tv-app/src-tauri/target/**/release/bundle/msi/*.msi
+            packages/tv-app/src-tauri/target/**/release/bundle/macos/*.tar.gz
+            packages/tv-app/src-tauri/target/**/release/bundle/macos/*.dmg
+            packages/tv-app/src-tauri/target/**/release/bundle/macos/*.app.zip
           if-no-files-found: warn
 
       - name: Upload to Release
@@ -93,14 +98,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
         run: |
-          # 用 gh release upload --clobber 替换 softprops/action-gh-release：
-          # 后者在重跑同一 tag 时删除已存在 asset 会报 "Not found"（delete-a-release-asset），
-          # 且 glob 展开由本步用 find 控制，行为更可控。
-          mapfile -t FILES < <(find packages/tv-app/src-tauri/target -path '*/release/bundle/*' -type f)
+          # 只上传最终安装包，排除构建脚本/模板/图标等中间产物。
+          # Tauri v2 产出：
+          #   Windows: bundle/nsis/*.exe（NSIS 安装包）、bundle/msi/*.msi
+          #   macOS:   bundle/macos/*.tar.gz / *.dmg / *.app.zip
+          mapfile -t FILES < <(find packages/tv-app/src-tauri/target \
+            -path '*/release/bundle/*' \
+            \( -name '*.exe' -o -name '*.msi' -o -name '*.tar.gz' -o -name '*.dmg' -o -name '*.app.zip' \) \
+            -type f)
           if [ ${#FILES[@]} -eq 0 ]; then
-            echo "::error::未发现桌面端构建产物 (target/**/release/bundle/**)"
+            echo "::error::未发现桌面端安装包 (.exe/.msi/.tar.gz/.dmg/.app.zip)"
             exit 1
           fi
-          printf '上传 %d 个产物:\n' "${#FILES[@]}"
+          printf '上传 %d 个安装包:\n' "${#FILES[@]}"
           printf '  %s\n' "${FILES[@]}"
           gh release upload "$TAG" "${FILES[@]}" --clobber --repo "${{ github.repository }}"
