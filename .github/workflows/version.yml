@@ -63,20 +63,20 @@ jobs:
             exit 1
           fi
 
-          # 先确认 workflow 文件存在
+          # 先确认 workflow 文件存在（--repo 绕过 git 上下文检测，本 workflow 无 checkout 步骤）
           echo "--- 查找 release.yml ---"
-          gh workflow list --json name,state,path 2>&1 || true
+          gh workflow list --json name,state,path --repo "${{ github.repository }}" 2>&1 || true
           echo ""
 
           WF=".github/workflows/release.yml"
           echo "::notice::通过 workflow_dispatch 触发 ${WF} (tag=${TAG})"
-          gh workflow run "${WF}" -f tag="$TAG" 2>&1
+          gh workflow run "${WF}" -f tag="$TAG" --repo "${{ github.repository }}" 2>&1
           RC=$?
           if [ $RC -ne 0 ]; then
             echo "::error::gh workflow run 失败 (exit code: ${RC})"
             # 尝试用 workflow 名（不含路径）作为备选
             echo "--- 尝试备选：用 workflow 名 ---"
-            gh workflow run "release.yml" -f tag="$TAG" 2>&1 || true
+            gh workflow run "release.yml" -f tag="$TAG" --repo "${{ github.repository }}" 2>&1 || true
             exit 1
           fi
           echo "✅ dispatch 成功"
