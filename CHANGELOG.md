@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.3](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.2...v0.3.3) (2026-08-13)
+
+
+### Bug Fixes
+
+* **ci:** 修复 version.yml if 表达式引用 secrets 导致的校验失败 ([58bc6d8](https://github.com/fengmuxi/NAS-KTV/commit/58bc6d84aca9bdd8d595c3ff35a5c4c20d60014e))
+* **ci:** 统一 pnpm 版本源，修复 desktop/android 构建版本冲突 ([eddd300](https://github.com/fengmuxi/NAS-KTV/commit/eddd3001cf1e0980ecc781e03fe319c31eeb8181))
+
 ## [0.3.2](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.1...v0.3.2) (2026-08-13)
 
 
