@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.5](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.4...v0.3.5) (2026-08-13)
+
+
+### Bug Fixes
+
+* **ci:** 增强 gh workflow run 调试（列出可用 workflow + 备选路径） ([6e0d0c9](https://github.com/fengmuxi/NAS-KTV/commit/6e0d0c9c3ed03973e3af7ba11bf0cada7a9fef1e))
+
 ## [0.3.4](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.3...v0.3.4) (2026-08-13)
 
 
