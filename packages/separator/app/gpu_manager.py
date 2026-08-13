@@ -103,6 +103,8 @@ class GpuInfo:
     available: bool
     name: Optional[str] = None
     memory_mb: Optional[int] = None
+    driver_version: Optional[str] = None
+    driver_cuda_version: Optional[str] = None
     cuda_available: bool = False
     torch_version: Optional[str] = None
     torch_cuda_version: Optional[str] = None
@@ -112,12 +114,14 @@ class GpuInfo:
         return asdict(self)
 
 def detect_nvidia_gpu() -> list[dict]:
+    """查询 nvidia-smi：GPU 名称、显存、驱动版本、驱动支持的最高 CUDA 版本。"""
     nvidia_smi = shutil.which('nvidia-smi')
     if not nvidia_smi:
         return []
     try:
         result = subprocess.run(
-            [nvidia_smi, '--query-gpu=name,memory.total', '--format=csv,noheader,nounits'],
+            [nvidia_smi, '--query-gpu=name,memory.total,driver_version',
+             '--format=csv,noheader,nounits'],
             capture_output=True, text=True, timeout=10
         )
         if result.returncode != 0:
@@ -130,7 +134,21 @@ def detect_nvidia_gpu() -> list[dict]:
             if len(parts) >= 2:
                 name = parts[0]
                 mem = int(parts[1]) if parts[1].strip().isdigit() else 0
-                gpus.append({'name': name, 'memory_mb': mem})
+                gpu = {'name': name, 'memory_mb': mem}
+                if len(parts) >= 3:
+                    gpu['driver_version'] = parts[2] or None
+                gpus.append(gpu)
+        if not gpus:
+            return []
+        # cuda_version 不是合法的 query 字段，从默认输出的表头解析驱动支持的最高 CUDA 版本
+        header = subprocess.run(
+            [nvidia_smi], capture_output=True, text=True, timeout=10
+        )
+        if header.returncode == 0:
+            m = re.search(r'CUDA Version:\s*([0-9.]+)', header.stdout[:2000])
+            cuda_version = m.group(1) if m else None
+            for gpu in gpus:
+                gpu['driver_cuda_version'] = cuda_version
         return gpus
     except (FileNotFoundError, subprocess.TimeoutExpired, ValueError):
         return []
@@ -155,82 +173,23 @@ def get_torch_info() -> dict:
         pass
     return {}
 
-def get_gpu_info() -> GpuInfo:
+def get_gpu_info(torch_info: Optional[dict] = None) -> GpuInfo:
+    """GPU 硬件信息 + torch 信息。
+
+    torch_info 可由调用方传入（复用后台安装管理器的探测缓存），
+    避免每次请求都触发慢速的子进程 torch 导入。
+    """
     gpus = detect_nvidia_gpu()
-    torch_info = get_torch_info()
+    if torch_info is None:
+        torch_info = get_torch_info()
     return GpuInfo(
         available=len(gpus) > 0,
         name=gpus[0]['name'] if gpus else None,
         memory_mb=gpus[0]['memory_mb'] if gpus else None,
+        driver_version=gpus[0].get('driver_version') if gpus else None,
+        driver_cuda_version=gpus[0].get('driver_cuda_version') if gpus else None,
         cuda_available=torch_info.get('cuda_available', False),
         torch_version=torch_info.get('version'),
         torch_cuda_version=torch_info.get('cuda_version'),
         venv_exists=os.path.exists(_get_python()),
     )
-
-async def _run_pytorch_install(index_url: str, label: str, success_msg: str, fail_msg: str, proxy: Optional[str] = None) -> AsyncGenerator[str, None]:
-    """执行 torch/torchaudio 重装（pip 优先，uv 兜底），流式输出进度。"""
-    tool, base_cmd = _find_installer()
-    yield f'{label}\n'
-    yield f'Using {tool}: {" ".join(base_cmd)}\n'
-    yield f'PyTorch index: {index_url}\n'
-    if proxy:
-        yield f'Proxy: {proxy}\n'
-    yield '\n'
-
-    env = os.environ.copy()
-    if proxy:
-        env['HTTP_PROXY'] = proxy
-        env['HTTPS_PROXY'] = proxy
-        env['ALL_PROXY'] = proxy
-
-    process = await asyncio.create_subprocess_exec(
-        *base_cmd,
-        '--force-reinstall',
-        'torch', 'torchaudio',
-        '--index-url', index_url,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.STDOUT,
-        cwd=SEPARATOR_DIR,
-        env=env,
-    )
-
-    async for line in _stream_lines(process):
-        yield line
-
-    await process.wait()
-
-    if process.returncode == 0:
-        yield f'\n{success_msg}\n'
-    else:
-        yield f'\n{fail_msg} (exit code {process.returncode})\n'
-
-
-async def install_gpu_pytorch(proxy: Optional[str] = None) -> AsyncGenerator[str, None]:
-    if not os.path.exists(_get_python()):
-        yield 'ERROR: Python environment not found.\n'
-        return
-
-    async for line in _run_pytorch_install(
-        PYTORCH_INDEX_URL,
-        'Starting GPU PyTorch installation (CUDA 12.4) ...',
-        'Installation completed successfully!',
-        'Installation failed',
-        proxy,
-    ):
-        yield line
-
-
-async def uninstall_gpu_pytorch(proxy: Optional[str] = None) -> AsyncGenerator[str, None]:
-    if not os.path.exists(_get_python()):
-        yield 'ERROR: Python environment not found.\n'
-        return
-
-    async for line in _run_pytorch_install(
-        PYTORCH_CPU_INDEX_URL,
-        'Uninstalling GPU PyTorch, will reinstall CPU version ...',
-        'CPU PyTorch installed successfully.',
-        'Failed',
-        proxy,
-    ):
-        yield line

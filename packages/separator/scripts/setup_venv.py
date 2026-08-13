@@ -1,5 +1,6 @@
 import os
 import sys
+import argparse
 import subprocess
 import shutil
 import platform
@@ -58,7 +59,7 @@ def create_venv():
 
 def install_base_deps():
     req_file = os.path.join(SEPARATOR_DIR, 'requirements.txt')
-    print(f'[setup] Installing dependencies from {req_file} ...')
+    print(f'[setup] Installing base dependencies from {req_file} (PyTorch/Demucs not included, installed separately) ...')
     print(f'[setup] Using mirror: {PYPI_INDEX_URL}')
     run_uv('pip', 'install',
         '--python', get_venv_python(),
@@ -66,46 +67,45 @@ def install_base_deps():
         '--index-url', PYPI_INDEX_URL,
         '--trusted-host', PYPI_TRUSTED_HOST,
     )
-    print('[setup] Dependencies installed.')
+    print('[setup] Base dependencies installed.')
 
-def detect_gpu():
-    nvidia_smi = shutil.which('nvidia-smi')
-    if not nvidia_smi:
-        return []
-    try:
-        result = subprocess.run(
-            [nvidia_smi, '--query-gpu=name,memory.total', '--format=csv,noheader,nounits'],
-            capture_output=True, text=True, timeout=10
-        )
-        if result.returncode == 0 and result.stdout.strip():
-            gpus = []
-            for line in result.stdout.strip().split('\n'):
-                if not line.strip():
-                    continue
-                parts = [p.strip() for p in line.split(',')]
-                if len(parts) >= 2:
-                    gpus.append({'name': parts[0], 'memory_mb': int(parts[1]) if parts[1].isdigit() else 0})
-            return gpus
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        pass
-    return []
-
-def install_gpu_pytorch():
-    print('[setup] Installing GPU-enabled PyTorch (CUDA 12.4) ...')
-    print('[setup] This may take several minutes depending on network speed.')
-    print(f'[setup] PyTorch index: {PYTORCH_INDEX_URL}')
-    print(f'[setup] Fallback mirror: {PYPI_INDEX_URL}')
+def install_torch():
+    """同步安装 PyTorch + Demucs（--with-torch 模式）。有 NVIDIA GPU 时安装 CUDA 版，否则 CPU 版。"""
+    gpus = detect_gpu()
+    if gpus:
+        target = 'cuda'
+        index_url = PYTORCH_INDEX_URL
+        print(f'[setup] Detected GPU: {gpus[0]["name"]}')
+    else:
+        target = 'cpu'
+        index_url = os.environ.get('PYTORCH_CPU_INDEX_URL') or 'https://download.pytorch.org/whl/cpu'
+    print(f'[setup] Installing {target} PyTorch ...')
+    print(f'[setup] PyTorch index: {index_url}')
+    print(f'[setup] This may take several minutes depending on network speed.')
     print('')
     rc = run_uv_stream('pip', 'install',
         '--python', get_venv_python(),
         '--force-reinstall',
         'torch', 'torchaudio',
-        '--index-url', PYTORCH_INDEX_URL,
+        '--index-url', index_url,
     )
     if rc != 0:
-        print(f'\n[setup] GPU PyTorch installation failed (exit code {rc})')
+        print(f'\n[setup] PyTorch installation failed (exit code {rc})')
         return False
-    print('\n[setup] GPU PyTorch installed.')
+    print(f'\n[setup] {target} PyTorch installed.')
+
+    req_file = os.path.join(SEPARATOR_DIR, 'requirements-runtime.txt')
+    print(f'\n[setup] Installing Demucs from {req_file} ...')
+    rc = run_uv_stream('pip', 'install',
+        '--python', get_venv_python(),
+        '-r', req_file,
+        '--index-url', PYPI_INDEX_URL,
+        '--trusted-host', PYPI_TRUSTED_HOST,
+    )
+    if rc != 0:
+        print(f'\n[setup] Demucs installation failed (exit code {rc})')
+        return False
+    print('\n[setup] Demucs installed.')
     return True
 
 def verify_installation():
@@ -129,10 +129,37 @@ def verify_installation():
     else:
         print(f'[setup] Warning: Could not verify Demucs: {result.stderr.strip()}')
 
+def detect_gpu():
+    nvidia_smi = shutil.which('nvidia-smi')
+    if not nvidia_smi:
+        return []
+    try:
+        result = subprocess.run(
+            [nvidia_smi, '--query-gpu=name,memory.total', '--format=csv,noheader,nounits'],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            gpus = []
+            for line in result.stdout.strip().split('\n'):
+                if not line.strip():
+                    continue
+                parts = [p.strip() for p in line.split(',')]
+                if len(parts) >= 2:
+                    gpus.append({'name': parts[0], 'memory_mb': int(parts[1]) if parts[1].isdigit() else 0})
+            return gpus
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+    return []
+
 def main():
     print('=' * 50)
     print('NASKTV Separator - Venv Setup')
     print('=' * 50)
+
+    parser = argparse.ArgumentParser(description='NASKTV Separator venv setup')
+    parser.add_argument('--with-torch', action='store_true',
+                        help='同步安装 PyTorch + Demucs（默认由服务启动后后台自动安装）')
+    args = parser.parse_args()
 
     create_venv()
     install_base_deps()
@@ -140,11 +167,17 @@ def main():
     gpus = detect_gpu()
     if gpus:
         print(f'\n[setup] Detected GPU: {gpus[0]["name"]}')
-        install_gpu_pytorch()
     else:
-        print('\n[setup] No NVIDIA GPU detected, using CPU PyTorch.')
+        print('\n[setup] No NVIDIA GPU detected.')
 
-    verify_installation()
+    if args.with_torch:
+        if not install_torch():
+            sys.exit(1)
+        verify_installation()
+    else:
+        print('\n[setup] PyTorch/Demucs 未安装。分隔服务启动后将自动在后台安装'
+              '（也可手动执行 setup_venv.py --with-torch 同步安装，'
+              '或将离线 .whl 安装包放入 data/separator-install/ 由服务后台离线安装）。')
 
     print('\n' + '=' * 50)
     print('Setup complete!')

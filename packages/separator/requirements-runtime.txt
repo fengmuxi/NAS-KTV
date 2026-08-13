@@ -1,0 +1,4 @@
+# PyTorch 运行时（人声分离引擎核心），由 install_manager 后台安装或 setup_venv --with-torch 安装：
+# - torch / torchaudio 需按平台指定 index 安装（CPU / CUDA），不列在此文件
+# - 此处仅列必须在 PyPI 上安装的依赖；torch 已装时 demucs 不会重复拉取 torch
+demucs>=4.0.0

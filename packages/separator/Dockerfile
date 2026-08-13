@@ -20,10 +20,11 @@ COPY app/ ./app/
 RUN pip install --no-cache-dir --retries 5 --timeout 300 \
     torch torchaudio --index-url https://download.pytorch.org/whl/cpu
 
-# Install remaining dependencies (demucs will pull in numpy/scipy/etc.)
-RUN pip install --no-cache-dir --retries 5 --timeout 120 -r requirements.txt
+# Install remaining dependencies: base app deps + runtime engine (demucs; torch 已装时不会重复拉取)
+RUN pip install --no-cache-dir --retries 5 --timeout 120 \
+    -r requirements.txt -r requirements-runtime.txt
 
-RUN mkdir -p /app/cache /app/data
+RUN mkdir -p /app/cache /app/data /app/data/separator-install
 
 ENV TORCH_HOME=/app/cache
 ENV DEMUCS_CACHE=/app/cache

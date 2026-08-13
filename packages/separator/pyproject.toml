@@ -1,22 +1,22 @@
 [project]
 name = "nasktv-separator"
-version = "0.1.0"
+version = "0.2.0"
 description = "NASKTV Vocal Separation Microservice"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.104.0",
     "uvicorn[standard]>=0.24.0",
     "numpy>=1.26.0",
-    "torch>=2.1.0",
-    "torchaudio>=2.1.0",
     "soundfile>=0.12.0",
-    "demucs>=4.0.0",
     "pydantic>=2.0.0",
     "python-multipart>=0.0.6",
     "requests>=2.28.0",
 ]
 
 [project.optional-dependencies]
+runtime = [
+    "demucs>=4.0.0",
+]
 dev = [
     "pytest>=7.0.0",
     "httpx>=0.25.0",

@@ -8,6 +8,8 @@
 const SEPARATOR_URL =
   process.env.SEPARATOR_SERVICE_URL || 'http://localhost:8001';
 const DEFAULT_TIMEOUT_MS = 30000;
+// torch 探测/安装状态查询可能触发慢速子进程，放宽超时避免首次请求 502
+const INSTALL_TIMEOUT_MS = 60000;
 
 export const SEPARATION_MODELS = [
   'htdemucs',
@@ -52,10 +54,36 @@ export interface GpuInfo {
   available: boolean;
   name?: string | null;
   memory_mb?: number | null;
+  driver_version?: string | null;
+  driver_cuda_version?: string | null;
   cuda_available: boolean;
   torch_version?: string | null;
   torch_cuda_version?: string | null;
   venv_exists: boolean;
+  torch_available?: boolean;
+  install_state?: 'installed' | 'installing' | 'failed' | 'not_installed' | 'unknown';
+  install_stage?: string | null;
+  install_progress?: number;
+}
+
+export interface InstallStatus {
+  state: 'installed' | 'installing' | 'failed' | 'not_installed';
+  mode?: string | null;
+  target?: string | null;
+  stage?: string | null;
+  progress: number;
+  error?: string | null;
+  torch_available: boolean;
+  torch_version?: string | null;
+  torch_cuda_version?: string | null;
+  demucs_available: boolean;
+  demucs_version?: string | null;
+  install_dir: string;
+  wheel_files: string[];
+  logs: string[];
+  started_at?: number | null;
+  finished_at?: number | null;
+  reason?: string | null;
 }
 
 class SeparatorClient {
@@ -146,7 +174,7 @@ class SeparatorClient {
   }
 
   async getGpuInfo(): Promise<GpuInfo> {
-    return this.request<GpuInfo>('GET', '/api/gpu/info');
+    return this.request<GpuInfo>('GET', '/api/gpu/info', undefined, INSTALL_TIMEOUT_MS);
   }
 
   async installGpu(proxy?: string): Promise<Response> {
@@ -161,6 +189,63 @@ class SeparatorClient {
     return fetch(`${this.baseURL}/api/gpu/install-cpu${qs}`, {
       method: 'POST',
     });
+  }
+
+  async getInstallStatus(): Promise<InstallStatus> {
+    return this.request<InstallStatus>('GET', '/api/install/status', undefined, INSTALL_TIMEOUT_MS);
+  }
+
+  async triggerInstall(body: {
+    target?: 'auto' | 'cpu' | 'cuda';
+    mode?: 'pip' | 'wheel';
+    proxy?: string;
+  }): Promise<{ accepted: boolean; message: string }> {
+    return this.request<{ accepted: boolean; message: string }>(
+      'POST',
+      '/api/install/trigger',
+      body,
+    );
+  }
+
+  async uploadInstallFile(filename: string, buffer: Buffer, mimetype: string): Promise<{
+    uploaded: string;
+    wheel_files: string[];
+    install_state: string;
+    auto_started: boolean;
+    message: string;
+  }> {
+    const form = new FormData();
+    form.append('file', new Blob([new Uint8Array(buffer)], { type: mimetype }), filename);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 60000);
+
+    try {
+      const response = await fetch(`${this.baseURL}/api/install/upload`, {
+        method: 'POST',
+        body: form,
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        let detail = `HTTP ${response.status}`;
+        try {
+          const errBody = await response.json();
+          const msg = (errBody as any)?.detail;
+          if (msg) detail = typeof msg === 'string' ? msg : JSON.stringify(msg);
+        } catch {
+          // 忽略 JSON 解析错误
+        }
+        throw new Error(`Separator service error: ${detail}`);
+      }
+      return (await response.json()) as {
+        uploaded: string;
+        wheel_files: string[];
+        install_state: string;
+        auto_started: boolean;
+        message: string;
+      };
+    } finally {
+      clearTimeout(timer);
+    }
   }
 }
 

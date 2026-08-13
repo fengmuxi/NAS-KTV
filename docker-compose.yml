@@ -50,12 +50,14 @@ services:
       - ./data/songs:/app/data/songs:ro
       - ./data/separation:/app/data/separation
       - ./data/separator-cache:/app/cache
+      - ./data/separator-install:/app/data/separator-install
     environment:
       - TORCH_HOME=/app/cache
       - DEMUCS_CACHE=/app/cache
       - HF_ENDPOINT=${HF_ENDPOINT:-https://hf-mirror.com}
       - SEPARATION_CONCURRENCY=${SEPARATION_CONCURRENCY:-2}
       - PYTORCH_INDEX_URL=${PYTORCH_INDEX_URL:-https://download.pytorch.org/whl/cu124}
+      - SEPARATOR_INSTALL_DIR=/app/data/separator-install
     deploy:
       resources:
         reservations:
