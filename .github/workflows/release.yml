@@ -36,6 +36,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # 三条构建线相互独立（不同产物 / 不同 runner / 缓存键不冲突），并行执行以缩短发布耗时。
+  # 各自内部的 matrix（docker 3 镜像 / desktop 4 目标 / android 2 APK）也并行。
+  # Release 已由 release:published 事件保证存在，desktop/android 并发上传不同资产互不冲突。
   docker:
     uses: ./.github/workflows/docker.yml
     secrets: inherit
@@ -43,14 +46,12 @@ jobs:
       tag: ${{ github.event.release.tag_name || inputs.tag }}
 
   desktop:
-    needs: docker
     uses: ./.github/workflows/desktop.yml
     secrets: inherit
     with:
       tag: ${{ github.event.release.tag_name || inputs.tag }}
 
   android:
-    needs: desktop
     uses: ./.github/workflows/android.yml
     secrets: inherit
     with:
