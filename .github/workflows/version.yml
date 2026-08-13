@@ -50,9 +50,21 @@ jobs:
           # 将「是否配置了 PAT」传入脚本；空字符串 = 未配置
           HAS_PAT: ${{ secrets.RELEASE_PLEASE_TOKEN != '' && 'true' || 'false' }}
         run: |
+          echo "=== Dispatch Fallback Debug ==="
+          echo "HAS_PAT=${HAS_PAT}"
+          echo "TAG='${TAG}'"
+          echo "release_created=${{ steps.release.outputs.release_created }}"
           if [ "$HAS_PAT" = "true" ]; then
             echo "::notice::RELEASE_PLEASE_TOKEN 已配置，release:published 将自动触发 release.yml，跳过 dispatch"
-          else
-            echo "::notice::未配置 RELEASE_PLEASE_TOKEN，通过 workflow_dispatch 兜底触发 release.yml"
-            gh workflow run release.yml -f tag="$TAG"
+            exit 0
           fi
+          if [ -z "$TAG" ]; then
+            echo "::error::tag_name 输出为空，无法触发 release.yml"
+            exit 1
+          fi
+          echo "::notice::通过 workflow_dispatch 触发 release.yml (tag=${TAG})"
+          gh workflow run release.yml -f tag="$TAG" 2>&1 || {
+            echo "::error::gh workflow run 失败 (exit code: $?)"
+            exit 1
+          }
+          echo "✅ dispatch 成功"
