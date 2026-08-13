@@ -16,6 +16,9 @@ import { useRoomSync } from './hooks/useRoomSync';
 import ExpiringBanner from './components/ExpiringBanner';
 import ConnectionBanner from './components/ConnectionBanner';
 import { AlertCircle, RefreshCw } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
+
+const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 function App() {
   const { setRoom, room } = useRoomStore();
@@ -33,6 +36,16 @@ function App() {
 
   // 监听房间 WebSocket 消息，同步队列/当前项到 store
   useRoomSync();
+
+  // 启动时无条件拉起 UDP 发现 + 手机配置 HTTP 服务（Tauri 环境，幂等）。
+  // 之前只在 Setup 页 / BackendConfigOverlay 里启动，导致已配置的 app 启动时
+  // 这两个服务从未运行——手机扫码后配置页拉取 /servers 拿到空列表，无法发现局域网设备。
+  // 现在在 App 根组件启动时就拉起，确保 TV 一直在监听广播、随时可被手机连接配置。
+  useEffect(() => {
+    if (!IS_TAURI) return;
+    invoke('start_discovery').catch(() => {});
+    invoke('start_config_server').catch(() => {});
+  }, []);
 
   // 防重入锁：避免同一次 effect 内并发 bootstrap（如快速重渲染）。
   // 注意：在 cleanup 中重置，确保 StrictMode 第二次 effect 能正常执行。
