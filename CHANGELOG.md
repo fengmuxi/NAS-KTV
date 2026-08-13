@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.8](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.7...v0.3.8) (2026-08-13)
+
+
+### Bug Fixes
+
+* **ci:** Android 改用直接 tauri android build 调用，修复 --apk 非法参数 ([8369db8](https://github.com/fengmuxi/NAS-KTV/commit/8369db809331a5a6f3df158a37a9f10a05799c6f))
+* **ci:** 桌面端上传脚本兼容 macOS（替换 mapfile 为 read 循环） ([5530acf](https://github.com/fengmuxi/NAS-KTV/commit/5530acf404748b1dcd65253a2140f77e0bb0ddd5))
+
 ## [0.3.7](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.6...v0.3.7) (2026-08-13)
 
 
