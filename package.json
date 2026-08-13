@@ -1,7 +1,7 @@
 {
   "name": "nasktv",
   "private": true,
-  "version": "0.3.9",
+  "version": "0.3.11",
   "scripts": {
     "build": "pnpm -r run build",
     "dev": "start /B node scripts/dev-proxy.js & pnpm -r --parallel run dev",

@@ -1,6 +1,6 @@
 {
   "name": "@nasktv/mobile-h5",
-  "version": "0.3.9",
+  "version": "0.3.11",
   "private": true,
   "type": "module",
   "scripts": {
