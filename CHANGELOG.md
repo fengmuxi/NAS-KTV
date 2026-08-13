@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.9](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.8...v0.3.9) (2026-08-13)
+
+
+### Bug Fixes
+
+* **ci:** Android 目标名改用 tauri 简化名（aarch64/armv7） ([e4ae6d2](https://github.com/fengmuxi/NAS-KTV/commit/e4ae6d22c8632d67e49506da2780f980ddd18228))
+
 ## [0.3.8](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.7...v0.3.8) (2026-08-13)
 
 
