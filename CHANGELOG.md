@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.10](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.9...v0.3.10) (2026-08-13)
+
+
+### Bug Fixes
+
+* **ci:** 给 Android release APK 加签名（修 INSTALL_PARSE_FAILED_NO_CERTIFICATES） ([3ff7a07](https://github.com/fengmuxi/NAS-KTV/commit/3ff7a076689e45b8175860e79b8320421f0d2eeb))
+* **tv-app:** 修复打包 exe 每次启动重新获取设备号 + 移除构建时 baseurl 兜底 ([fe046a3](https://github.com/fengmuxi/NAS-KTV/commit/fe046a3680e781cb1b2755ebee79c51f5194b3f4))
+* **tv-app:** 启动时无条件拉起 UDP 发现 + 配置服务，修复已配置时扫码无法发现局域网设备 ([365fc23](https://github.com/fengmuxi/NAS-KTV/commit/365fc231f16ab123a27d49e01ffa9033226d9d22))
+
 ## [0.3.9](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.8...v0.3.9) (2026-08-13)
 
 
