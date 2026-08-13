@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.7](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.6...v0.3.7) (2026-08-13)
+
+
+### Bug Fixes
+
+* **ci:** 修复 release 产物上传与 Android 构建失败 ([5d1fcac](https://github.com/fengmuxi/NAS-KTV/commit/5d1fcacaae84be83ea6893e7e459042441e3754f))
+* **ci:** 收紧 desktop Release 上传范围，只传最终安装包 ([3eecace](https://github.com/fengmuxi/NAS-KTV/commit/3eecace0b728db374b85faa146ea96ea0fa4ad5f))
+
 ## [0.3.6](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.5...v0.3.6) (2026-08-13)
 
 
