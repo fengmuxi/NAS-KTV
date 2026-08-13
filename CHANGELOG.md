@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.11](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.10...v0.3.11) (2026-08-13)
+
+
+### Bug Fixes
+
+* **tv-app:** make auto-scan discovered backend connectable ([2c9957f](https://github.com/fengmuxi/NAS-KTV/commit/2c9957f0ebe7acd07f82f17ef4a53905ecf6174b))
+* **tv-app:** 构建期将 globalThis 替换为 window 修复旧 WebView 崩溃 ([aaecd21](https://github.com/fengmuxi/NAS-KTV/commit/aaecd2148b59d9abee07bad1181ca177db58f611))
+
 ## [0.3.10](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.9...v0.3.10) (2026-08-13)
 
 
