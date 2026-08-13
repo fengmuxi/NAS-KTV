@@ -29,12 +29,15 @@ struct DiscoveredServer {
   ws_url: String,
 }
 
-/// 返回给前端 JS 的发现结果
+/// 返回给前端 JS 的发现结果。
+/// 注意：字段序列化为 `apiUrl`（与 TV 端 BackendConfig / 手机配置页 POST 体 `apiUrl` 命名一致），
+/// 而非后端广播里的 `apiBaseUrl`。前端 Setup 页与手机配置页均按 `apiUrl` 读取；
+/// 若此处输出 `apiBaseUrl`，前端拿到的是 undefined，点击扫描结果会「无法连接」。
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct DiscoveredServerView {
   name: String,
-  api_base_url: String,
+  api_url: String,
   ws_url: String,
 }
 
@@ -106,7 +109,7 @@ fn collect_servers(state: &State<'_, DiscoveryState>) -> Vec<DiscoveredServerVie
     .iter()
     .map(|(s, _)| DiscoveredServerView {
       name: s.name.clone(),
-      api_base_url: s.api_base_url.clone(),
+      api_url: s.api_base_url.clone(),
       ws_url: s.ws_url.clone(),
     })
     .collect()
@@ -141,7 +144,7 @@ fn start_config_server(app: AppHandle, state: State<'_, DiscoveryState>) -> Resu
           .iter()
           .map(|(s, _)| DiscoveredServerView {
             name: s.name.clone(),
-            api_base_url: s.api_base_url.clone(),
+            api_url: s.api_base_url.clone(),
             ws_url: s.ws_url.clone(),
           })
           .collect();

@@ -37,6 +37,11 @@ android {
             }
         }
         getByName("release") {
+            // release 必须放开明文流量：本应用通过 http://<局域网IP> 连接后端（UDP 广播 / WebSocket / REST 均为明文），
+            // defaultConfig 的 usesCleartextTraffic=false 会让 release APK 完全无法访问 http 后端——
+            // UDP 发现走原生 Rust 不受 WebView 限制（故能扫到设备），但点击连接的 fetch 与随后的 ws://
+            // 会被 Android 明文策略拦截，表现为「扫描到设备却无法连接」。与 debug 对齐放开。
+            manifestPlaceholders["usesCleartextTraffic"] = "true"
             // CI 必须签名 release（否则装不上：`INSTALL_PARSE_FAILED_NO_CERTIFICATES`）。
             // 这里复用 debug signingConfig（AGP 自动用 ~/.android/debug.keystore），
             // CI 步骤会用 keytool 提前生成该 keystore。

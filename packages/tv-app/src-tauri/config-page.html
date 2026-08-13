@@ -95,10 +95,10 @@
       name.textContent = s.name || 'NASKTV';
       var url = document.createElement('div');
       url.className = 's-url';
-      url.textContent = s.apiBaseUrl;
+      url.textContent = s.apiUrl;
       item.appendChild(name);
       item.appendChild(url);
-      item.addEventListener('click', function () { save(s.apiBaseUrl); });
+      item.addEventListener('click', function () { save(s.apiUrl); });
       listEl.appendChild(item);
     });
   }
@@ -107,11 +107,11 @@
     fetch('/servers', { cache: 'no-store' })
       .then(function (res) { return res.json(); })
       .then(function (data) {
-        // 按 apiBaseUrl 去重（保留首个）
+        // 按 apiUrl 去重（保留首个）
         var seen = {};
         var uniq = [];
         (data || []).forEach(function (s) {
-          if (!seen[s.apiBaseUrl]) { seen[s.apiBaseUrl] = true; uniq.push(s); }
+          if (!seen[s.apiUrl]) { seen[s.apiUrl] = true; uniq.push(s); }
         });
         renderServers(uniq);
       })
