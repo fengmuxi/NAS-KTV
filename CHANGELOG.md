@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.6](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.5...v0.3.6) (2026-08-13)
+
+
+### Bug Fixes
+
+* **ci:** 修复 gh workflow run 因缺少 .git 上下文导致的失败 ([1d72cf5](https://github.com/fengmuxi/NAS-KTV/commit/1d72cf5d87b4a78512b927e0dcf7a070d8d5716f))
+
 ## [0.3.5](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.4...v0.3.5) (2026-08-13)
 
 
