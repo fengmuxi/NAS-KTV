@@ -50,6 +50,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Sync version to tag
+        if: ${{ inputs.tag != '' }}
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+        run: node scripts/set-version.mjs "${TAG#v}"
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 

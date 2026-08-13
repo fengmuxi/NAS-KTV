@@ -1,8 +1,21 @@
 #!/usr/bin/env node
-// 将各包的版本号统一为传入的产品版本（发布时 = git tag）。
-// 调用：node scripts/set-version.mjs 1.2.3
-// 版本来源优先级：argv[2] > 环境变量 GITHUB_REF_NAME(去 v) > .release-please-manifest.json
-import { readFileSync, writeFileSync } from 'node:fs';
+// 统一全局产品版本号。
+//
+// 唯一版本来源：.release-please-manifest.json（= GitHub Release tag，如 0.2.0）。
+// release-please 只维护该 manifest 文件，本脚本负责把它“扇出”到所有需要版本号的产物：
+//   - 根 package.json
+//   - packages/*/package.json（backend / admin-web / mobile-h5 / tv-app / shared / separator ...）
+//   - packages/tv-app/src-tauri/tauri.conf.json（Tauri 打包版本）
+//   - packages/separator/pyproject.toml（Python 微服务版本）
+//
+// 调用：
+//   node scripts/set-version.mjs            # 无参数：从 manifest 读取（本地 dev/build 用）
+//   node scripts/set-version.mjs 1.2.3      # 显式版本（CI 发布时用，= git tag 去 v）
+//
+// 版本来源优先级：argv[2] > 环境变量 GITHUB_REF_NAME / TAG（去 v）> .release-please-manifest.json
+//
+// 仅当内容真正变化时才写文件，避免产生无意义的 git diff / 文件 mtime 抖动。
+import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
@@ -31,20 +44,42 @@ if (!/^\d+\.\d+\.\d+/.test(version)) {
   process.exit(1);
 }
 
-const targets = [
-  'packages/backend/package.json',
-  'packages/admin-web/package.json',
-  'packages/mobile-h5/package.json',
-  'packages/tv-app/package.json',
+// 1) 所有 JSON 目标：根 + 各 packages/*/package.json + tauri.conf.json
+const jsonTargets = [
+  'package.json',
+  ...readdirSync(resolve(root, 'packages'))
+    .filter((name) => existsSync(resolve(root, 'packages', name, 'package.json')))
+    .map((name) => `packages/${name}/package.json`),
   'packages/tv-app/src-tauri/tauri.conf.json',
 ];
 
-for (const rel of targets) {
+let changed = 0;
+for (const rel of jsonTargets) {
   const p = resolve(root, rel);
-  const json = JSON.parse(readFileSync(p, 'utf-8'));
+  const raw = readFileSync(p, 'utf-8');
+  const json = JSON.parse(raw);
+  if (json.version === version) {
+    console.log(`[set-version] ${rel} already ${version}`);
+    continue;
+  }
   json.version = version;
   writeFileSync(p, JSON.stringify(json, null, 2) + '\n', 'utf-8');
   console.log(`[set-version] ${rel} -> ${version}`);
+  changed += 1;
 }
 
-console.log(`[set-version] done (${version})`);
+// 2) separator 的 pyproject.toml（PEP 621：version = "x.y.z"）
+const pyproject = resolve(root, 'packages/separator/pyproject.toml');
+if (existsSync(pyproject)) {
+  const raw = readFileSync(pyproject, 'utf-8');
+  const updated = raw.replace(/^(version\s*=\s*")([^"]*)(")/m, `$1${version}$3`);
+  if (updated !== raw) {
+    writeFileSync(pyproject, updated, 'utf-8');
+    console.log(`[set-version] packages/separator/pyproject.toml -> ${version}`);
+    changed += 1;
+  } else {
+    console.log(`[set-version] packages/separator/pyproject.toml already ${version}`);
+  }
+}
+
+console.log(`[set-version] done (${version})${changed ? `, ${changed} file(s) updated` : ', no change'}`);
