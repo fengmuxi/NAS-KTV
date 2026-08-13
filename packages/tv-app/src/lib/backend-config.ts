@@ -25,6 +25,7 @@ function deriveWsUrl(apiUrl: string): string {
  */
 export async function loadBackendConfig(): Promise<BackendConfig | null> {
   if (isTauriEnvironment()) {
+    // 1) 优先读取应用数据目录文件
     try {
       const dataDir = await appDataDir();
       const filePath = await join(dataDir, CONFIG_FILE);
@@ -35,6 +36,17 @@ export async function loadBackendConfig(): Promise<BackendConfig | null> {
       }
     } catch (e) {
       console.error('Failed to load backend config file:', e);
+    }
+    // 2) 回退读取 localStorage —— save 在文件写入失败时会写入此处，
+    //    必须对称读取，否则「数据目录不可写」环境下保存成功却 reload 后回到 Setup 死循环
+    try {
+      const raw = localStorage.getItem(CONFIG_STORAGE_KEY);
+      if (raw) {
+        const cfg = JSON.parse(raw) as BackendConfig;
+        if (cfg?.apiUrl) return cfg;
+      }
+    } catch (e) {
+      console.error('Failed to load backend config from localStorage:', e);
     }
   } else {
     try {
@@ -57,34 +69,36 @@ export async function loadBackendConfig(): Promise<BackendConfig | null> {
 }
 
 /**
- * 保存后端配置（Tauri 优先写入应用数据目录文件，失败则回退到 localStorage）
+ * 保存后端配置（Tauri 下「文件 + localStorage」双写：文件为主，localStorage 为回退/备份；
+ * 仅当两者都失败时才抛出，确保权限受限环境下仍能通过 localStorage 持久化并在 reload 后读回）
  */
 export async function saveBackendConfig(apiUrl: string): Promise<BackendConfig> {
   const normalized = apiUrl.trim().replace(/\/+$/, '');
   const cfg: BackendConfig = { apiUrl: normalized, wsUrl: deriveWsUrl(normalized) };
 
   if (isTauriEnvironment()) {
-    let fileError: unknown;
+    let fileOk = false;
     try {
       const dataDir = await appDataDir();
       const filePath = await join(dataDir, CONFIG_FILE);
       await mkdir(dataDir, { recursive: true });
       await writeTextFile(filePath, JSON.stringify(cfg));
-      return cfg;
+      fileOk = true;
     } catch (e) {
-      fileError = e;
-      console.warn('Tauri app data write failed, falling back to localStorage:', e);
+      console.warn('Tauri app data dir write failed, relying on localStorage:', e);
     }
 
-    // 文件写入失败时回退到 localStorage，避免 .exe 在权限受限环境完全不可用
+    let storageOk = false;
     try {
       localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(cfg));
-      return cfg;
-    } catch (storageErr) {
-      const details =
-        (fileError instanceof Error ? fileError.message : String(fileError)) ||
-        'unknown file error';
-      throw new Error(`配置保存失败：${details}`);
+      storageOk = true;
+    } catch (e) {
+      console.warn('localStorage write failed:', e);
+    }
+
+    // 两处都失败才视为真正失败（文件成功即返回成功，localStorage 仅作备份）
+    if (!fileOk && !storageOk) {
+      throw new Error('数据目录不可写且浏览器存储不可用，请检查应用权限');
     }
   } else {
     localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(cfg));
@@ -93,7 +107,8 @@ export async function saveBackendConfig(apiUrl: string): Promise<BackendConfig> 
 }
 
 /**
- * 清除保存的后端配置（设置页「重新配置」用），恢复首次使用状态
+ * 清除保存的后端配置（设置页「重新配置」用），恢复首次使用状态。
+ * Tauri 下同时清除文件与 localStorage，避免任一来源的残留配置影响重载判定。
  */
 export async function resetBackendConfig(): Promise<void> {
   if (isTauriEnvironment()) {
@@ -105,6 +120,11 @@ export async function resetBackendConfig(): Promise<void> {
       }
     } catch (e) {
       console.error('Failed to reset backend config file:', e);
+    }
+    try {
+      localStorage.removeItem(CONFIG_STORAGE_KEY);
+    } catch (e) {
+      console.error('Failed to reset backend config in localStorage:', e);
     }
   } else {
     localStorage.removeItem(CONFIG_STORAGE_KEY);

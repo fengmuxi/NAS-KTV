@@ -1,5 +1,7 @@
-/* Hallmark · genre: atmospheric · macrostructure: waiting-room · design-system: design.md · designed-as-app */
-import { Loader2 } from 'lucide-react';
+/* Hallmark · genre: atmospheric · macrostructure: waiting-room · design-system: design.md · designed-as-app
+ * states: static (no interactive elements) · contrast: pass (≥7:1 for 10-foot UI)
+ */
+import { useState } from 'react';
 import { useRoomStore } from '../stores/room';
 import client from '../api/client';
 
@@ -24,50 +26,58 @@ const css = `
 
 export default function Bootstrap() {
   const { room } = useRoomStore();
+  const [logoError, setLogoError] = useState(false);
 
   if (!room) {
     return (
-      <div className="min-h-screen bg-paper flex flex-col items-center justify-center gap-md">
-        <Loader2 className="w-12 h-12 text-accent animate-spin" />
-        <p className="text-ink-2 text-lg">正在注册设备...</p>
+      <div className="h-screen bg-paper flex flex-col items-center justify-center gap-md overflow-hidden">
+        <div className="w-12 h-12 rounded-2xl bg-accent/15 text-accent flex items-center justify-center shrink-0">
+          <span className="font-display text-xl font-bold">N</span>
+        </div>
+        <p className="text-ink-2 text-base shrink-0">正在注册设备...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-paper flex flex-col items-center justify-center gap-xl px-2xl">
+    <div className="h-screen bg-paper flex flex-col items-center justify-center gap-lg px-2xl overflow-hidden">
       <style>{css}</style>
 
-      <div className="text-center">
-        <img
-          src={`${apiBase()}/logo`}
-          alt=""
-          className="w-20 h-20 rounded-2xl object-cover mx-auto mb-xl"
-        />
-        <h1 className="font-display text-4xl text-ink mb-lg tracking-tight">NASKTV</h1>
-        <p className="text-ink-2 text-lg mb-xl">等待管理员授权</p>
+      {/* 顶部 Logo + 标题 — 紧凑布局 */}
+      <div className="text-center shrink-0">
+        {!logoError ? (
+          <img
+            src={`${apiBase()}/logo`}
+            alt=""
+            className="w-14 h-14 rounded-xl object-cover mx-auto mb-lg"
+            onError={() => setLogoError(true)}
+          />
+        ) : (
+          <div className="w-14 h-14 rounded-xl bg-accent/15 text-accent flex items-center justify-center mx-auto mb-lg">
+            <span className="font-display text-2xl font-bold">N</span>
+          </div>
+        )}
+        <h1 className="font-display text-3xl text-ink mb-sm tracking-tight leading-tight">NASKTV</h1>
+        <p className="text-ink-2 text-base">等待管理员授权</p>
       </div>
 
-      <div className="flex items-stretch">
-        {/* 焦点：房间码 */}
-        <div
-          className="bootstrap-glow flex flex-col items-center justify-center bg-paper-2 px-3xl py-3xl text-center"
-          style={{ boxShadow: 'var(--shadow-glow-soft)' }}
-        >
-          <p className="font-mono text-sm text-ink-3 tracking-[0.35em] mb-xl">
-            房间码
-          </p>
-          <p className="font-mono text-5xl text-accent tracking-[0.3em] mb-xl">
-            {room.code}
-          </p>
-          <p className="font-mono text-sm text-ink-3 max-w-[24ch] break-all">
-            {room.deviceId}
-          </p>
-        </div>
-
+      {/* 房间码卡片 — 缩小内边距和字号，适配 720p */}
+      <div
+        className="bootstrap-glow flex flex-col items-center justify-center bg-paper-2 px-2xl py-2xl text-center shrink-0"
+        style={{ boxShadow: 'var(--shadow-glow-soft)' }}
+      >
+        <p className="font-mono text-xs text-ink-3 tracking-[0.35em] mb-lg">
+          房间码
+        </p>
+        <p className="font-mono text-4xl text-accent tracking-[0.25em] mb-lg">
+          {room.code}
+        </p>
+        <p className="font-mono text-xs text-ink-3 max-w-[24ch] break-all leading-relaxed">
+          {room.deviceId}
+        </p>
       </div>
 
-      <p className="text-ink-3 text-base mt-xl">
+      <p className="text-ink-3 text-sm shrink-0">
         请管理员在后台审核并授权此设备
       </p>
     </div>
