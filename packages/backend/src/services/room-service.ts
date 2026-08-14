@@ -43,17 +43,36 @@ type ActiveJoinTicket = {
 // 每个房间仅保留一个当前加入票据；签发新票据会使旧二维码立即失效。
 const activeJoinTickets = new Map<number, ActiveJoinTicket>();
 
-function generateAuthorizationCode(): string {
-  for (;;) {
+/** 查询某加入码当前是否被任一房间占用（含未过期）。用于避免跨房间的码冲突。 */
+async function isJoinCodeTaken(code: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: rooms.id })
+    .from(rooms)
+    .where(
+      and(
+        eq(rooms.currentJoinCode, code),
+        gt(rooms.joinCodeExpiresAt, new Date()),
+      ),
+    )
+    .limit(1);
+  return !!row;
+}
+
+async function generateAuthorizationCode(): Promise<string> {
+  for (let attempt = 0; attempt < 20; attempt++) {
     let code = '';
     for (let i = 0; i < ROOM_CODE_LENGTH; i++) {
       code += ROOM_CODE_CHARS[Math.floor(Math.random() * ROOM_CODE_CHARS.length)];
     }
-    const duplicated = [...activeJoinTickets.values()].some(
+    const inMemoryDuplicated = [...activeJoinTickets.values()].some(
       ticket => ticket.authorizationCode === code && ticket.expiresAt > Date.now(),
     );
-    if (!duplicated) return code;
+    if (inMemoryDuplicated) continue;
+    // 同时校验 DB 中仍生效的码，避免与另一房间（或本进程重启前签发）冲突
+    if (await isJoinCodeTaken(code)) continue;
+    return code;
   }
+  throw new Error('生成加入码失败，请重试');
 }
 
 export async function issueRoomJoinTicket(
@@ -87,7 +106,7 @@ export async function issueRoomJoinTicket(
     };
   }
   const jti = randomUUID();
-  const authorizationCode = generateAuthorizationCode();
+  const authorizationCode = await generateAuthorizationCode();
 
   const joinToken = jwt.sign(
     {
@@ -107,6 +126,11 @@ export async function issueRoomJoinTicket(
     expiresAt,
     authorizedAt,
   });
+  // Plan B：将当前加入码持久化到 rooms 表，使「仅含授权码」的扫码加入对后端重启免疫。
+  await db
+    .update(rooms)
+    .set({ currentJoinCode: authorizationCode, joinCodeExpiresAt: new Date(expiresAt) })
+    .where(eq(rooms.id, roomId));
   return {
     authorizationCode,
     joinToken,
@@ -126,18 +150,21 @@ async function resolveRoomJoinTicket(
     authorizedAt?: number;
   };
   if (!joinToken) {
-    const matched = [...activeJoinTickets.entries()].find(
-      ([, ticket]) =>
-        ticket.authorizationCode === authorizationCode && ticket.expiresAt > Date.now(),
-    );
-    if (!matched) {
+    // Plan B：无 token 兜底改为查 rooms 表持久化的当前加入码，对后端重启免疫。
+    const [room] = await db
+      .select()
+      .from(rooms)
+      .where(
+        and(
+          eq(rooms.currentJoinCode, authorizationCode),
+          gt(rooms.joinCodeExpiresAt, new Date()),
+        ),
+      )
+      .limit(1);
+    if (!room) {
       throw createAppError('动态加入码无效或已过期，请查看电视上的新加入码', 403);
     }
-    const room = await assertRoomControlAvailable(matched[0]);
-    if ((room.authorizedAt?.getTime() ?? 0) !== matched[1].authorizedAt) {
-      throw createAppError('动态加入码属于旧授权周期，请查看电视上的新加入码', 403);
-    }
-    return room;
+    return assertRoomControlAvailable(room.id);
   }
   try {
     claims = jwt.verify(joinToken, config.jwtSecret) as typeof claims;
@@ -428,6 +455,11 @@ export async function rotateRoomCode(
 
   // 旧加入票据立即失效，新码下必须重新签发
   activeJoinTickets.delete(roomId);
+  // 同步清掉持久化的当前加入码，避免旧码仍可扫码加入
+  await db
+    .update(rooms)
+    .set({ currentJoinCode: null, joinCodeExpiresAt: null })
+    .where(eq(rooms.id, roomId));
 
   // 通知旧码下所有在线客户端并断开（先广播再断开，保证客户端先收到消息）
   broadcastRoomClosed(oldCode, { roomCode: oldCode, reason: 'code_rotated' });
@@ -478,7 +510,7 @@ export async function findExpiringSoonRooms(withinMinutes: number): Promise<Room
 export async function closeRoom(id: number): Promise<Room | null> {
   const [room] = await db
     .update(rooms)
-    .set({ status: 'closed', closedAt: new Date() })
+    .set({ status: 'closed', closedAt: new Date(), currentJoinCode: null, joinCodeExpiresAt: null })
     .where(eq(rooms.id, id))
     .returning();
 
@@ -517,7 +549,7 @@ export async function revokeExpiredAuthorizations(): Promise<Room[]> {
   for (const room of expiredRooms) {
     await db
       .update(rooms)
-      .set({ authorized: 0, status: 'revoked' })
+      .set({ authorized: 0, status: 'revoked', currentJoinCode: null, joinCodeExpiresAt: null })
       .where(eq(rooms.id, room.id))
       .run();
     await expireRoomSessions(room.id);

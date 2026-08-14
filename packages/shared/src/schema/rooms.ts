@@ -18,6 +18,8 @@ export const rooms = sqliteTable('rooms', {
   createdAt: integer('created_at', { mode: 'timestamp' }),
   closedAt: integer('closed_at', { mode: 'timestamp' }),
   lastActiveAt: integer('last_active_at', { mode: 'timestamp' }),
+  currentJoinCode: text('current_join_code'),
+  joinCodeExpiresAt: integer('join_code_expires_at', { mode: 'timestamp' }),
 });
 
 export const roomQueues = sqliteTable('room_queues', {
