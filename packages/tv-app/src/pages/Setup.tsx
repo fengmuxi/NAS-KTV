@@ -400,7 +400,7 @@ export default function Setup() {
                 aria-label="后端服务地址"
                 tabIndex={0}
                 disabled={manualStatus === 'verifying'}
-                className="w-full px-lg py-sm bg-paper border border-border rounded-2xl text-ink font-mono text-sm placeholder:text-ink-3 focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
+                className="w-full px-lg py-sm bg-paper border border-border rounded-2xl text-ink font-mono text-sm placeholder:text-xs placeholder:text-ink-3 focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
               />
               <button
                 onClick={submitManual}
