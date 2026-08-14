@@ -3,7 +3,7 @@
  * designed-as-app
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRoomStore } from '../stores/room';
 import { roomsApi } from '../api/rooms';
@@ -371,13 +371,22 @@ export default function Join() {
     setLeaveReason(messages[reason] ?? null);
   }, []);
 
+  // 通过二维码链接（手机系统/微信「扫一扫」直接打开）进入时，授权码已随 URL 带入。
+  // 直接自动加入房间，无需用户再手动点击「加入房间」按钮。
+  // 昵称由 loadNickname 保底（无保存值时自动生成随机昵称），不会因昵称为空而中断自动加入。
+  const autoJoinedRef = useRef(false);
   useEffect(() => {
+    if (autoJoinedRef.current) return;
     const params = new URLSearchParams(window.location.search);
     const codeFromUrl = params.get('authorizationCode');
     const tokenFromUrl = params.get('joinToken');
     if (codeFromUrl && /^[A-Z0-9]{6}$/.test(codeFromUrl)) {
       setAuthorizationCode(codeFromUrl);
       setJoinToken(tokenFromUrl);
+      autoJoinedRef.current = true;
+      // handleJoin 为函数声明，已 hoisted；此处自动加入，避免扫完还需手动点击
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      handleJoin(codeFromUrl, tokenFromUrl);
     }
   }, []);
 

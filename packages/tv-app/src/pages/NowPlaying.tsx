@@ -346,7 +346,7 @@ export default function NowPlaying() {
 
   const qrText =
     h5Base && joinTicket
-      ? `${h5Base.replace(/\/+$/, '')}/join?authorizationCode=${joinTicket.authorizationCode}`
+      ? `${h5Base.replace(/\/+$/, '')}/join?authorizationCode=${joinTicket.authorizationCode}&joinToken=${encodeURIComponent(joinTicket.joinToken)}`
       : '';
 
   // 本地生成「点歌二维码」图片（data URL），规避后端跨域图片被 CORP 拦截（ERR_BLOCKED_BY_RESPONSE.NotSameOrigin）
