@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.13...v0.4.0) (2026-08-14)
+
+
+### Features
+
+* **h5:** persist room join code to DB for restart-immune QR scan ([1afff0b](https://github.com/fengmuxi/NAS-KTV/commit/1afff0b987afc93d000259f1a495ae471ac7166a))
+
+
+### Bug Fixes
+
+* **android:** improve LAN discovery for Android TV ([ca1b44f](https://github.com/fengmuxi/NAS-KTV/commit/ca1b44fe96b14b08c097277818e272598bfdc77c))
+* **mobile-h5,tv-app:** 扫码点歌自动进入房间 ([7a917f6](https://github.com/fengmuxi/NAS-KTV/commit/7a917f67fdb74cf80759cbdc819fb549f82d13a0))
+
 ## [0.3.13](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.12...v0.3.13) (2026-08-13)
 
 
