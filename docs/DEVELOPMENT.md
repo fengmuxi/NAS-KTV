@@ -818,7 +818,64 @@ curl http://localhost:8001/health
 - PyTorch 体积较大（~2GB），CPU 推理可用但较慢
 - 有 CUDA 环境可手动安装 GPU 版 PyTorch 加速
 
-**Windows 安装 ffmpeg**：
+#### Separator 环境管理（venv / GPU / HuggingFace）
+
+**一键搭建 Python 环境**（推荐）：
+
+```bash
+# 方式一：通过 pnpm（无需手动 cd）
+pnpm --filter @nasktv/separator setup
+
+# 方式二：手动进入目录执行
+cd packages/separator
+python scripts/setup_venv.py
+```
+
+脚本自动完成：用 `uv` 创建 `.venv`（Python 3.12）→ 用国内 PyPI 镜像安装 `requirements.txt` 全部依赖 → 检测 NVIDIA GPU 并安装 CUDA 版 PyTorch（如有）→ 验证 PyTorch / Demucs 安装结果。
+
+| 脚本特性 | 说明 |
+|---------|------|
+| 自动创建 venv | 用 `uv` 创建 `.venv`，若已存在则跳过 |
+| 国内镜像加速 | 默认清华 PyPI 镜像（`pypi.tuna.tsinghua.edu.cn`），可用 `PIP_INDEX_URL` 切换 |
+| GPU 自动检测 | 运行 `nvidia-smi` 检测 NVIDIA GPU，有则安装 CUDA 12.4 版 PyTorch |
+| 安装验证 | 自动验证 PyTorch 版本、CUDA 可用性、Demucs 可导入 |
+
+切换镜像源示例：
+```bash
+PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple pnpm --filter @nasktv/separator setup
+```
+
+`requirements.txt` 关键依赖：fastapi / uvicorn / numpy / torch / torchaudio / demucs / pydantic / python-multipart / requests / soundfile。
+
+**HuggingFace 模型下载**：Demucs 首次运行需从 HuggingFace 下载模型（约 80MB）。`main.py` 中已配置：若 `HF_ENDPOINT` 未设置，自动使用 `https://hf-mirror.com` 国内镜像；模型缓存于 `packages/separator/cache/`，下载一次后无需重复下载；如需官方源，在 `.env` 设置 `HF_ENDPOINT=https://huggingface.co`。
+
+**手动安装 GPU PyTorch**（可选）：
+```bash
+cd packages/separator
+# 通过后台 API 安装（输出实时日志）：POST http://localhost:8001/api/gpu/install-gpu
+# 或手动安装：
+.venv\Scripts\python.exe -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+```
+
+#### ffmpeg 安装说明
+
+ffmpeg 是 separator 的运行时依赖（音频抽取/转码），安装分两处：**Docker 部署自动装好，本地开发需手动装**。
+
+**Docker / 生产环境（自动安装）** — 唯一自动安装点在 `packages/separator/Dockerfile`：
+
+```dockerfile
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libsndfile1 \
+    libgomp1 \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+```
+
+基于 `python:3.11-slim`，随 separator 镜像构建，无需额外操作。
+
+**本地开发（需手动安装）** — 没有任何脚本自动装（`scripts/setup_venv.py` 不装 ffmpeg，torch/demucs 的 `install_manager.py` 也不装）。Windows 三种方式：
+
 ```bash
 # 方式 1：winget
 winget install ffmpeg
@@ -827,8 +884,12 @@ winget install ffmpeg
 choco install ffmpeg
 
 # 方式 3：手动下载
-# https://www.gyan.dev/ffmpeg/builds/
+# https://www.gyan.dev/ffmpeg/builds/  解压后将 bin/ 加入 PATH
 ```
+
+要求 **ffmpeg 6+**，且能直接 `ffmpeg -version` 命中（即在 PATH 中）。
+
+**路径查找逻辑**（见 `packages/separator/app/audio_utils.py`）：`get_ffmpeg_path()` 默认取环境变量 `FFMPEG_PATH`，未设置则直接调用 PATH 中的 `ffmpeg`；`ffprobe` 同理（当 `FFMPEG_PATH` 指向目录或可执行文件时自动推导同级 `ffprobe`）。因此本地只需保证 `ffmpeg`/`ffprobe` 在 PATH 上即可；若装在非标准路径，设置 `FFMPEG_PATH` 环境变量（例如 `C:\ffmpeg\bin\ffmpeg.exe`）即可。
 
 ## 五、环境变量完整说明
 
@@ -1160,10 +1221,11 @@ pnpm format
 
 ## 十一、参考文档
 
-- [../README.md](../README.md) — 项目总览
-- [../ARCHITECTURE.md](../ARCHITECTURE.md) — 系统架构
+- [../README.md](../README.md) — 项目总览与文档导航
+- [../ARCHITECTURE.md](../ARCHITECTURE.md) — 系统架构（架构图 / 服务划分 / 通信机制 / WebSocket 消息 / 数据流 / 数据库概览 / 数据卷）
+- [./API.md](./API.md) — REST API 接口参考
 - [../AGENTS.md](../AGENTS.md) — AI 编码助手项目指令
 - [../deploy/README.md](../deploy/README.md) — 生产部署指南
 - [../.env.example](../.env.example) — 环境变量完整示例
-- [../DEVELOPMENT_PLAN.md](../DEVELOPMENT_PLAN.md) — 开发计划
+- [../DEVELOPMENT_PLAN.md](../DEVELOPMENT_PLAN.md) — 开发路线图与规划历史
 - [.trae/specs/](../.trae/specs/) — 各阶段规格说明

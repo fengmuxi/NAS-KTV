@@ -1,6 +1,6 @@
 # 飞牛 NAS KTV 系统 — 部署指南
 
-> 本文档覆盖本地开发与生产部署两种场景。
+> 本文档聚焦**生产部署（Docker Compose）**。本地开发（环境要求、首次搭建、各子包 dev 启动、数据库迁移、日志、构建、Separator 的 venv 一键脚本 / GPU 检测 / HuggingFace 镜像 / 手动 GPU PyTorch 安装、ffmpeg 安装）请参考 **[docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md)**。
 
 ## 一、项目概览
 
@@ -20,242 +20,15 @@ pnpm workspace monorepo，所有子包位于 `packages/` 目录下。
 
 ## 二、本地开发环境
 
-### 2.1 环境要求
+本文档**不重复**本地开发步骤。请移步 **[docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md)**，包含：
 
-| 依赖 | 版本 | 用途 | 是否必需 |
-|------|------|------|---------|
-| Node.js | LTS 20+ | 后端 + 前端构建运行 | **必需** |
-| pnpm | 8+ | monorepo 包管理 | **必需** |
-| Python | 3.12 | separator 人声分离服务 | 仅 separator |
-| uv | 最新 | Python 包管理（替代 pip） | 仅 separator |
-| ffmpeg | 6+ | 音频转码（separator 依赖） | 仅 separator |
-| Rust | stable（1.77+） | Tauri 外壳编译 | 仅 TV App |
-| Tauri CLI | 2.x | TV App 构建工具链 | 仅 TV App |
-| JDK | 17+ | Android Gradle 构建 | 仅 TV App 打包 |
-| Android SDK + NDK | SDK 36 / NDK 26+ | 打包 Android TV APK | 仅 TV App 打包 |
+- 环境要求（Node / pnpm / Python / Rust / ffmpeg 等，按子项目按需安装）
+- 首次搭建（`pnpm install`、`.env` 配置、数据目录、数据库迁移）
+- 各子包 dev 启动与访问地址
+- Separator venv 一键脚本、GPU 自动检测、HuggingFace 镜像、手动 GPU PyTorch 安装
+- ffmpeg 安装说明
 
-> **提示**：若只开发后端 + Admin Web + Mobile H5，只需 Node.js + pnpm。separator 与 TV App 可按需安装。
-
-### 2.2 首次搭建
-
-```bash
-# 1. 克隆仓库
-git clone <仓库地址> nasktv
-cd nasktv
-
-# 2. 安装 Node.js 依赖（自动处理 workspace 链接）
-pnpm install
-
-# 3. 复制环境变量模板并按需修改
-cp .env.example .env
-# 编辑 .env，重点修改：
-#   JWT_SECRET — 改为随机强密钥
-#   ADMIN_PASSWORD — 改为强密码
-#   FFMPEG_PATH — 指向 ffmpeg 路径（如 C:\ffmpeg\bin\ffmpeg.exe）
-#   HF_ENDPOINT — 留空则自动使用 hf-mirror.com 镜像
-
-# 4. 创建数据目录
-mkdir -p data/songs data/separation data/db
-
-# 5.（可选）初始化数据库
-pnpm --filter @nasktv/backend db:migrate
-
-# 6.（可选）初始化 separator Python 虚拟环境
-#    需要 Python 3.12 + uv 已安装
-pnpm --filter @nasktv/separator setup
-#    等价于：cd packages/separator && python scripts/setup_venv.py
-#    脚本会自动：
-#    - 用 uv 创建 .venv 虚拟环境（Python 3.12）
-#    - 使用国内 PyPI 镜像安装 requirements.txt 中的所有依赖
-#    - 检测 NVIDIA GPU 并安装 CUDA 版 PyTorch（如有）
-#    - 验证 PyTorch 和 Demucs 安装结果
-```
-
-### 2.3 启动开发服务
-
-#### 一键启动所有服务
-
-```bash
-pnpm dev
-```
-
-该命令会并行启动以下服务：
-
-| 服务 | 端口 | 说明 |
-|------|------|------|
-| dev-proxy | 8080 | 统一开发入口，反代所有服务（与生产 Nginx 行为一致） |
-| backend | 3000 | API + WebSocket，tsx watch 热重载 |
-| admin-web | 5173 | Vite dev server，代理 /api 和 /ws 到 :3000 |
-| mobile-h5 | 5174 | Vite dev server，代理 /api 和 /ws 到 :3000 |
-| tv-app | 1420 | Vite dev server，代理 /api 和 /ws 到 :3000 |
-| separator | 8001 | uvicorn --reload，使用 .venv 虚拟环境 |
-
-> 启动前会自动执行 `predev` 脚本清理被占用的端口（3000/5173/5174/1420/8001/8080）。
-
-#### 单独启动某个服务
-
-```bash
-# 后端（热重载）
-pnpm --filter @nasktv/backend dev
-
-# 管理后台
-pnpm --filter @nasktv/admin-web dev
-
-# 手机 H5
-pnpm --filter @nasktv/mobile-h5 dev
-
-# TV App（仅 WebView，不启动 Tauri 壳）
-pnpm --filter @nasktv/tv-app dev
-
-# TV App（Tauri 桌面模式，需 Rust 环境）
-pnpm --filter @nasktv/tv-app tauri:dev
-
-# 人声分离服务（使用 venv）
-pnpm --filter @nasktv/separator dev
-```
-
-### 2.4 开发环境访问地址
-
-| 入口 | 地址 |
-|------|------|
-| 统一入口（推荐） | http://localhost:8080 |
-| 管理后台 | http://localhost:8080/admin/ |
-| 手机 H5 | http://localhost:8080/h5/ |
-| 后端 API | http://localhost:8080/api |
-| WebSocket | ws://localhost:8080/ws |
-| Separator API | http://localhost:8001/api |
-| 健康检查 | http://localhost:8001/api/health |
-| 日志查看 | http://localhost:8080/admin/logs（管理后台内） |
-
-> `pnpm dev` 会自动启动 dev-proxy（端口 8080），统一反代所有服务，开发体验与生产环境一致。Admin Web、Mobile H5、TV App 的 Vite dev server 已配置代理，`/api` 和 `/ws` 请求会自动转发到后端 :3000。
-
-### 2.5 数据库操作
-
-```bash
-# 生成迁移文件（修改 schema 后执行）
-pnpm --filter @nasktv/backend db:generate
-
-# 执行迁移
-pnpm --filter @nasktv/backend db:migrate
-
-# 启动 Drizzle Studio（可视化数据库管理）
-pnpm --filter @nasktv/backend db:studio
-```
-
-### 2.6 日志系统
-
-管理后台提供实时日志查看功能，通过 WebSocket 实时推送后端日志：
-
-- **访问地址**：http://localhost:8080/admin/logs（开发）或 `http://NAS_IP:8080/admin/logs`（生产）
-- **功能**：实时查看后端运行日志、过滤日志级别、搜索日志内容
-- **WebSocket 路径**：`/ws/logs`，dev-proxy 已配置自动转发
-
-### 2.7 类型检查与构建
-
-```bash
-# 类型检查所有 TypeScript 包
-pnpm build
-
-# 单独构建某个包
-pnpm --filter @nasktv/admin-web build      # 产物在 packages/admin-web/dist/
-pnpm --filter @nasktv/mobile-h5 build      # 产物在 packages/mobile-h5/dist/
-pnpm --filter @nasktv/tv-app build         # 产物在 packages/tv-app/dist/
-pnpm --filter @nasktv/backend build        # 产物在 packages/backend/dist/
-```
-
-### 2.8 Separator 服务管理
-
-#### 首次安装 Python 环境
-
-Separator 有一键环境部署脚本，可通过 pnpm 快捷命令运行：
-
-```bash
-# 方式一：通过 pnpm（推荐，无需手动 cd）
-pnpm --filter @nasktv/separator setup
-
-# 方式二：手动进入目录执行
-cd packages/separator
-python scripts/setup_venv.py
-```
-
-脚本自动完成以下步骤：
-
-```
-==================================================
-NASKTV Separator - Venv Setup
-==================================================
-[setup] Creating venv at packages/separator/.venv ...     ← 1. 创建 Python 3.12 虚拟环境
-[setup] venv created.
-[setup] Installing dependencies from requirements.txt ...  ← 2. 安装所有 Python 依赖
-[setup] Using mirror: https://pypi.tuna.tsinghua.edu.cn/simple
-[setup] Dependencies installed.
-[setup] No NVIDIA GPU detected, using CPU PyTorch.         ← 3. 自动检测 GPU（有则安装 CUDA 版）
-[setup] Verifying installation ...                         ← 4. 验证安装结果
-[setup] PyTorch 2.13.0, CUDA: False
-[setup] Demucs OK
-==================================================
-Setup complete!
-Venv: packages/separator/.venv
-Python: packages/separator/.venv/Scripts/python.exe
-==================================================
-```
-
-**脚本特性：**
-
-| 特性 | 说明 |
-|------|------|
-| 自动创建 venv | 使用 `uv` 创建 `.venv` 虚拟环境（Python 3.12），若已存在则跳过 |
-| 国内镜像加速 | 默认使用清华 PyPI 镜像（`pypi.tuna.tsinghua.edu.cn`），可通过 `PIP_INDEX_URL` 环境变量切换 |
-| GPU 自动检测 | 运行 `nvidia-smi` 检测 NVIDIA GPU，有则自动安装 CUDA 12.4 版 PyTorch |
-| 实时日志输出 | GPU 版 PyTorch 安装过程实时打印日志（~2GB），便于排查网络问题 |
-| 安装验证 | 自动验证 PyTorch 版本、CUDA 可用性、Demucs 是否可导入 |
-
-**环境变量：**
-
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `PIP_INDEX_URL` | `https://pypi.tuna.tsinghua.edu.cn/simple` | PyPI 镜像源地址 |
-
-**切换镜像源示例：**
-```bash
-# 使用阿里云镜像
-PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple pnpm --filter @nasktv/separator setup
-```
-
-#### 依赖说明
-
-`requirements.txt` 中的依赖列表：
-
-| 包 | 用途 |
-|---|------|
-| fastapi | Web 框架 |
-| uvicorn | ASGI 服务器 |
-| numpy | 数值计算（Demucs 运行时依赖） |
-| torch | PyTorch 深度学习框架 |
-| torchaudio | 音频处理 |
-| demucs | 人声分离模型（v4） |
-| pydantic | 数据校验 |
-| python-multipart | 文件上传支持 |
-| requests | HTTP 回调通知 |
-| soundfile | 音频文件读写（torchaudio 后端依赖） |
-
-#### HuggingFace 模型下载
-
-Demucs 首次运行需要从 HuggingFace 下载模型文件（约 80MB）。`main.py` 中已配置：
-- 若 `HF_ENDPOINT` 环境变量未设置，自动使用 `https://hf-mirror.com` 国内镜像
-- 模型缓存在 `packages/separator/cache/` 目录，下载一次后无需重复下载
-- 如需使用官方源，在 `.env` 中设置 `HF_ENDPOINT=https://huggingface.co`
-
-#### 手动安装 GPU PyTorch
-
-```bash
-cd packages/separator
-# 通过后台 API 安装（会输出实时日志）
-# POST http://localhost:8001/api/gpu/install-gpu
-
-# 或手动安装
-.venv\Scripts\python.exe -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
-```
+> 生产部署只需要 Docker，不需要在本机装 Node / pnpm / Python / Rust 等开发工具；歌曲文件放进 `data/songs/` 后执行 `docker compose up -d --build` 即可。
 
 ---
 
@@ -594,7 +367,7 @@ docker compose restart separator
 
 ## 九、TV App 打包（单独流程）
 
-TV App 不走 Docker，需在开发机单独打包：
+TV App 不走 Docker，需在开发机单独打包。完整的本地开发环境搭建（Rust / JDK 17 / Android SDK / NDK / cargo 镜像 / Windows 踩坑）见 **[docs/DEVELOPMENT.md §4.5](../docs/DEVELOPMENT.md#45-tv-appandroid-tv-app--tauri-2)**。
 
 ```bash
 # 前置条件：Node.js + pnpm + Rust + JDK 17+ + Android SDK (platform 36) + NDK 26+
