@@ -91,6 +91,8 @@ export interface Device {
   authorizeExpiresAt: string | null;
   lastActiveAt: string | null;
   status: string | null;
+  isOnline?: boolean;
+  memberCount?: number;
 }
 
 export interface Room {

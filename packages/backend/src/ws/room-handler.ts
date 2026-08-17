@@ -41,6 +41,21 @@ type RoomWs = WebSocket & {
 // 房间连接映射：roomCode → Set<WebSocket>
 const roomConnections = new Map<string, Set<RoomWs>>();
 
+/**
+ * 判断某房间的 TV 设备是否在线。
+ * 仅统计 role==='tv' 且处于 OPEN 状态的连接（移动端连接不计入，避免手机在线误判为设备在线）。
+ * roomConnections 在连接关闭时由 removeConnection 清理，因此结果即当前真实连接状态，
+ * 无需依赖 last_active_at 阈值估算，天然近实时。供设备列表实时在线状态使用。
+ */
+export function isRoomTvOnline(roomCode: string): boolean {
+  const conns = roomConnections.get(roomCode);
+  if (!conns || conns.size === 0) return false;
+  for (const ws of conns) {
+    if (ws.role === 'tv' && ws.readyState === WebSocket.OPEN) return true;
+  }
+  return false;
+}
+
 // 房间最新播放器状态缓存（roomCode → PlayerStatePayload）
 // 用于重连恢复时下发快照。重启丢失可接受（TV 端会重新上报 PLAYER_STATE）。
 const roomPlayerStateCache = new Map<string, PlayerStatePayload>();

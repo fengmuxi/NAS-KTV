@@ -11,6 +11,7 @@ import {
   broadcastRoomAuthorized,
   broadcastRoomUnauthorized,
   broadcastRoomClosed,
+  isRoomTvOnline,
 } from '../ws/room-handler';
 
 const { rooms, roomQueues, roomSessions } = schema;
@@ -52,6 +53,12 @@ export async function listDevices(
       status: rooms.status,
       lastActiveAt: rooms.lastActiveAt,
       createdAt: rooms.createdAt,
+      // 房间当前在房人数：room_sessions 中 leftAt 为空的会话数
+      memberCount: sql<number>`(
+        SELECT COUNT(*) FROM ${roomSessions}
+        WHERE ${roomSessions.roomId} = ${rooms.id}
+          AND ${roomSessions.leftAt} IS NULL
+      )`,
     })
     .from(rooms)
     .where(whereClause)
@@ -82,7 +89,12 @@ export async function listDevices(
   }
 
   // 映射为前端期望的字段名（roomCode / deviceName）
-  const items = rows.map((row) => mapRoomToDevice(row));
+  const items = rows.map((row) =>
+    mapRoomToDevice({
+      ...row,
+      memberCount: Number(row.memberCount ?? 0),
+    })
+  );
   return { items, total, limit: safeLimit, offset };
 }
 
@@ -257,7 +269,7 @@ function mapRoomToDevice(
     | 'status'
     | 'lastActiveAt'
     | 'createdAt'
-  >
+  > & { memberCount?: number }
 ): Device {
   return {
     id: room.id,
@@ -272,5 +284,7 @@ function mapRoomToDevice(
     status: room.status,
     lastActiveAt: room.lastActiveAt,
     createdAt: room.createdAt,
+    isOnline: isRoomTvOnline(room.code),
+    memberCount: room.memberCount,
   } as Device;
 }

@@ -700,6 +700,12 @@ export default function Devices() {
                     授权状态
                   </th>
                   <th className="text-left font-medium px-md py-sm whitespace-nowrap">
+                    在线状态
+                  </th>
+                  <th className="text-left font-medium px-md py-sm whitespace-nowrap">
+                    房间人数
+                  </th>
+                  <th className="text-left font-medium px-md py-sm whitespace-nowrap">
                     授权类型
                   </th>
                   <th className="text-left font-medium px-md py-sm whitespace-nowrap">
@@ -757,6 +763,16 @@ export default function Devices() {
                         <Badge variant={statusVariantMap[status]} dot>
                           {statusLabel[status]}
                         </Badge>
+                      </td>
+                      <td className="px-md py-sm">
+                        <Badge variant={device.isOnline ? 'success' : 'neutral'} dot>
+                          {device.isOnline ? '在线' : '离线'}
+                        </Badge>
+                      </td>
+                      <td className="px-md py-sm text-ink-2 whitespace-nowrap">
+                        {device.memberCount != null
+                          ? `${device.memberCount} 人`
+                          : '—'}
                       </td>
                       <td className="px-md py-sm">
                         <Badge variant={authorizeTypeVariant(device.authorizeType)}>

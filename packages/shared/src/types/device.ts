@@ -40,4 +40,8 @@ export type Device = Pick<
 > & {
   roomCode: string;
   deviceName: string | null;
+  /** TV 设备当前是否在线（基于 WS 连接注册表，近实时） */
+  isOnline?: boolean;
+  /** 房间当前在房人数（room_sessions 中 leftAt 为空的会话数） */
+  memberCount?: number;
 };
