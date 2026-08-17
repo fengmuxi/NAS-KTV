@@ -1,6 +1,6 @@
 [project]
 name = "nasktv-separator"
-version = "0.3.12"
+version = "0.4.0"
 description = "NASKTV Vocal Separation Microservice"
 requires-python = ">=3.11"
 dependencies = [
