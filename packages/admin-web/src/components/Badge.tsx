@@ -63,7 +63,7 @@ export default function Badge({
   return (
     <span
       className={[
-        'inline-flex items-center font-medium rounded-sm',
+        'inline-flex items-center font-medium rounded-sm whitespace-nowrap',
         sizeClasses[size],
         className,
       ].join(' ')}
