@@ -44,6 +44,9 @@ router.get('/', async (_req: Request, res: Response) => {
 
     // no-store：浏览器不对 Logo 做任何缓存（含标签页 favicon），管理员更换后各端刷新即可生效
     res.setHeader('Cache-Control', 'no-store');
+    // 覆盖 Helmet 默认的 same-origin：Logo 需被三端（含 TV Tauri WebView 跨源）嵌入，
+    // 否则会被 Cross-Origin-Resource-Policy 拦截（ERR_BLOCKED_BY_RESPONSE.NotSameOrigin）
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.sendFile(filePath, (err) => {
       if (err) {
         logger.error({ err, filePath }, 'Failed to send logo');

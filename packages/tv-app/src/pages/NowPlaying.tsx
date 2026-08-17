@@ -356,7 +356,7 @@ export default function NowPlaying() {
       setSongQrSrc('');
       return;
     }
-    QRCodeLib.toDataURL(qrText, { width: 240, margin: 1 })
+    QRCodeLib.toDataURL(qrText, { width: 480, margin: 1 })
       .then((url) => {
         if (!cancelled) setSongQrSrc(url);
       })
@@ -376,7 +376,7 @@ export default function NowPlaying() {
       setConfigQrSrc('');
       return;
     }
-    QRCodeLib.toDataURL(configQrUrl, { width: 240, margin: 1 })
+    QRCodeLib.toDataURL(configQrUrl, { width: 480, margin: 1 })
       .then((url) => {
         if (!cancelled) setConfigQrSrc(url);
       })
@@ -388,6 +388,9 @@ export default function NowPlaying() {
       cancelled = true;
     };
   }, [configQrUrl]);
+
+  // 扫码二维码尺寸改为视口自适应（TV 大屏不再固定 112/96px）；用 vmin 而非 clamp/min/max，兼容旧 Android WebView（Chrome<79 不支持 clamp）
+  const QR_SIZE = '18vmin';
 
   const qrBadge = qrText ? (
     <div className="qr-badge fixed top-2xl right-2xl z-40 flex flex-row items-center gap-lg rounded-xl p-md shadow-lg"
@@ -403,14 +406,13 @@ export default function NowPlaying() {
           <img
             src={songQrSrc}
             alt="手机扫码点歌"
-            width={112}
-            height={112}
+            style={{ width: QR_SIZE, height: QR_SIZE, imageRendering: 'pixelated' }}
             className="rounded-sm bg-paper p-xs"
           />
         ) : (
           <div
             className="flex items-center justify-center bg-paper rounded-sm p-xs"
-            style={{ width: 112, height: 112 }}
+            style={{ width: QR_SIZE, height: QR_SIZE }}
           >
             <Loader2 className="w-6 h-6 text-ink-2 animate-spin" />
           </div>
@@ -430,21 +432,20 @@ export default function NowPlaying() {
           <img
             src={configQrSrc}
             alt="扫码配置 TV"
-            width={96}
-            height={96}
+            style={{ width: QR_SIZE, height: QR_SIZE, imageRendering: 'pixelated' }}
             className="rounded-sm bg-paper p-xs"
           />
         ) : configQrError ? (
           <div
             className="flex items-center justify-center bg-paper rounded-sm p-xs text-center"
-            style={{ width: 96, height: 96 }}
+            style={{ width: QR_SIZE, height: QR_SIZE }}
           >
             <span className="text-ink-3 text-xs">{configQrError}</span>
           </div>
         ) : (
           <div
             className="flex items-center justify-center bg-paper rounded-sm"
-            style={{ width: 96, height: 96 }}
+            style={{ width: QR_SIZE, height: QR_SIZE }}
           >
             <Loader2 className="w-6 h-6 text-ink-2 animate-spin" />
           </div>
