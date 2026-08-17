@@ -204,6 +204,7 @@ export default function AiParse() {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
+  const [batchRetrying, setBatchRetrying] = useState(false);
 
   const [detailTask, setDetailTask] = useState<AiParseTask | null>(null);
   const [draftResult, setDraftResult] = useState<Record<string, any> | null>(null);
@@ -455,23 +456,28 @@ export default function AiParse() {
       showToast('warning', '请选择失败的任务');
       return;
     }
-    let ok = 0;
-    let fail = 0;
-    for (const task of failedSelected) {
-      try {
-        await aiParseApi.retry(task.id);
-        ok += 1;
-      } catch {
-        fail += 1;
+    setBatchRetrying(true);
+    try {
+      let ok = 0;
+      let fail = 0;
+      for (const task of failedSelected) {
+        try {
+          await aiParseApi.retry(task.id);
+          ok += 1;
+        } catch {
+          fail += 1;
+        }
       }
-    }
-    setSelected(new Set());
-    await loadTasks();
-    await loadStats();
-    if (fail > 0) {
-      showToast('error', `批量重试完成：成功 ${ok}，失败 ${fail}`);
-    } else {
-      showToast('success', `批量重试完成：${ok} 个任务`);
+      setSelected(new Set());
+      await loadTasks();
+      await loadStats();
+      if (fail > 0) {
+        showToast('error', `批量重试完成：成功 ${ok}，失败 ${fail}`);
+      } else {
+        showToast('success', `批量重试完成：${ok} 个任务`);
+      }
+    } finally {
+      setBatchRetrying(false);
     }
   };
 
@@ -902,6 +908,7 @@ export default function AiParse() {
               size="sm"
               onClick={handleBatchRetry}
               disabled={selectedCount === 0}
+              loading={batchRetrying}
               leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
             >
               批量重试

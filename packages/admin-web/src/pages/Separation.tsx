@@ -100,6 +100,7 @@ export default function Separation() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
+  const [batchRetrying, setBatchRetrying] = useState(false);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
 
@@ -285,6 +286,7 @@ export default function Separation() {
   };
 
   const doBatchRetry = async (ids: number[]) => {
+    setBatchRetrying(true);
     try {
       const res = await separationApi.batchRetry(ids);
       showToast('success', `批量重试完成：成功 ${res.succeeded}，跳过 ${res.skipped}`);
@@ -292,6 +294,8 @@ export default function Separation() {
       await loadTasks();
     } catch (err) {
       showToast('error', err instanceof Error ? err.message : '批量重试失败');
+    } finally {
+      setBatchRetrying(false);
     }
   };
 
@@ -542,14 +546,15 @@ export default function Separation() {
               已选 {selectedIds.size} 项
             </span>
             <div className="flex items-center gap-xs">
-              <Button
-                size="sm"
-                variant="ghost"
-                leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
-                onClick={handleBatchRetry}
-              >
-                批量重试
-              </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+              onClick={handleBatchRetry}
+              loading={batchRetrying}
+            >
+              批量重试
+            </Button>
               <Button
                 size="sm"
                 variant="ghost"
