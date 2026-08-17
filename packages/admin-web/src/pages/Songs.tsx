@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Pencil, Trash2, Bot, Mic, Search, RotateCcw, Headphones, Film, X, FileText, Upload } from 'lucide-react';
+import { Pencil, Trash2, Bot, Mic, Search, RotateCcw, Headphones, Film, X, FileText, Upload, RefreshCw } from 'lucide-react';
 import Button from '../components/Button';
 import ConfirmModal from '../components/ConfirmModal';
 import Badge from '../components/Badge';
@@ -89,6 +89,7 @@ export default function Songs() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [busyIds, setBusyIds] = useState<Set<number>>(new Set());
 
@@ -168,8 +169,9 @@ export default function Songs() {
 
   // Fetch songs
   const fetchSongs = useCallback(
-    async () => {
-      setLoading(true);
+    async (opts?: { showLoading?: boolean }) => {
+      const showLoading = opts?.showLoading !== false;
+      if (showLoading) setLoading(true);
       try {
         const data = await songsApi.list({
           page,
@@ -183,7 +185,7 @@ export default function Songs() {
       } catch {
         showToast('error', '加载歌曲列表失败');
       } finally {
-        setLoading(false);
+        if (showLoading) setLoading(false);
       }
     },
     [page, keyword, artistId, selectedCategoryItemIds, showToast]
@@ -192,6 +194,15 @@ export default function Songs() {
   useEffect(() => {
     fetchSongs();
   }, [fetchSongs]);
+
+  // 手动刷新：保留当前表格内容，仅按钮旋转；强制至少展示 400ms 保证可见
+  const handleRefresh = () => {
+    setRefreshing(true);
+    const minDelay = new Promise<void>((resolve) => window.setTimeout(resolve, 400));
+    Promise.all([fetchSongs({ showLoading: false }), minDelay])
+      .catch(() => {})
+      .finally(() => setRefreshing(false));
+  };
 
   // All checkbox indeterminate
   const allSelected = songs.length > 0 && songs.every((s) => selectedIds.has(s.id));
@@ -498,7 +509,18 @@ export default function Songs() {
       {/* Header */}
       <div className="flex items-center justify-between gap-md">
         <h1 className="text-2xl font-display font-bold text-ink">歌曲管理</h1>
-        <p className="text-sm text-ink-3">共 {total} 首</p>
+        <div className="flex items-center gap-sm">
+          <p className="text-sm text-ink-3">共 {total} 首</p>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={handleRefresh}
+            loading={refreshing}
+            leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+          >
+            刷新
+          </Button>
+        </div>
       </div>
 
       {/* Unified search */}
