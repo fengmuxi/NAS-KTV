@@ -204,8 +204,10 @@ export default function Devices() {
   }, [loadDevices]);
 
   // 自动轮询刷新：每 10 秒静默刷新设备列表，及时发现新注册设备。
-  // 当有弹窗打开时暂停轮询，避免干扰操作。
-  const hasOpenModal = authModal || renameModal || deleteModal || batchModal;
+  // 当有弹窗打开，或正在展示「撤销 Undo」横幅时暂停轮询，避免轮询在
+  // 延迟的撤销 API 真正发出前把仍是 active 的设备重新加回界面（导致界面不刷新）。
+  const hasOpenModal =
+    authModal || renameModal || deleteModal || batchModal || undoBanner;
   useEffect(() => {
     if (hasOpenModal) return;
     const timer = setInterval(() => {
@@ -293,6 +295,9 @@ export default function Devices() {
         showToast('error', msg);
       } finally {
         setUndoBanner(null);
+        // 撤销 API 落库后立即与服务端同步：成功→该行以「已撤销」状态重新出现，
+        // 失败→回滚为「已授权」。避免界面停留在乐观删除后的状态、看起来「不刷新」。
+        refreshDevices();
       }
     }, 5000);
     setUndoBanner({
