@@ -119,6 +119,8 @@ const MAX_RECONNECT_DELAY = 30000;
 export default function Logs() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  // 手动刷新专用 loading：仅控制刷新按钮的旋转动画，不影响首屏 loading 遮罩
+  const [refreshing, setRefreshing] = useState(false);
   const [levelFilter, setLevelFilter] = useState('');
   const [serviceFilter, setServiceFilter] = useState('');
   const [keyword, setKeyword] = useState('');
@@ -295,7 +297,8 @@ export default function Logs() {
 
   const handleRefresh = () => {
     setPaused(false);
-    loadLogs();
+    setRefreshing(true);
+    loadLogs().finally(() => setRefreshing(false));
   };
 
   const toggleAutoScroll = () => {
@@ -548,6 +551,7 @@ export default function Logs() {
               variant="ghost"
               size="sm"
               onClick={handleRefresh}
+              loading={refreshing}
               leftIcon={<RefreshCw className="w-4 h-4" aria-hidden="true" />}
               aria-label="刷新日志"
             >

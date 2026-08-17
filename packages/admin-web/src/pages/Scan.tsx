@@ -653,9 +653,16 @@ export default function Scan() {
             type="button"
             onClick={() => loadHistory()}
             disabled={historyLoading}
-            className="text-sm text-accent enabled:hover:text-accent-hover disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
+            className="text-sm text-accent enabled:hover:text-accent-hover disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm inline-flex items-center gap-1"
           >
-            刷新
+            {historyLoading ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+                刷新中
+              </>
+            ) : (
+              '刷新'
+            )}
           </button>
         </div>
         {historyLoading && historyItems.length === 0 ? (
