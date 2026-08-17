@@ -6,6 +6,7 @@ import { config } from '../config';
 import { authenticateToken } from '../middleware/jwt';
 import { db, schema } from '../db';
 import { sql, gte, eq, desc } from 'drizzle-orm';
+import { separatorClient } from '../services/separator-client';
 
 const router = Router();
 
@@ -330,6 +331,81 @@ router.get('/info', authenticateToken, async (req: Request, res: Response) => {
       .status(500)
       .json({ success: false, error: 'Failed to get system info' });
   }
+});
+
+/**
+ * GET /system/health - 各服务健康状态聚合（后台首页「服务健康」模块使用）
+ * 后端自身始终为 ok（能响应即代表存活）；分离服务通过 separatorClient 探测，
+ * 不可达视为 down。随仪表盘 10s 轮询刷新，故此处不做缓存。
+ */
+router.get('/health', authenticateToken, async (_req: Request, res: Response) => {
+  // 后端版本号：复用 /system/info 的读取方式（向上两层找 package.json）
+  let backendVersion = '0.0.0';
+  try {
+    const pkg = JSON.parse(
+      fs.readFileSync(path.resolve(__dirname, '../../package.json'), 'utf-8'),
+    );
+    backendVersion = pkg.version || '0.0.0';
+  } catch {
+    // 读取失败时回落到默认版本，不影响健康判定
+  }
+
+  const backend = {
+    status: 'ok' as const,
+    version: backendVersion,
+    uptimeSec: Math.floor(process.uptime()),
+  };
+
+  // 分离服务：并行探测健康详情与安装状态
+  let separator: {
+    status: 'ok' | 'down' | 'installing';
+    healthy: boolean;
+    device?: string;
+    ffmpegAvailable?: boolean;
+    modelLoaded?: boolean;
+    queueSize?: number;
+    installState: 'installed' | 'installing' | 'failed' | 'not_installed' | 'unknown';
+    installProgress?: number;
+    error?: string;
+  } = {
+    status: 'down',
+    healthy: false,
+    installState: 'unknown',
+  };
+
+  try {
+    const [health, install] = await Promise.all([
+      separatorClient.getHealth(),
+      separatorClient.getInstallStatus().catch(() => null),
+    ]);
+    const installing = install?.state === 'installing';
+    separator = {
+      status: installing ? 'installing' : 'ok',
+      healthy: true,
+      device: health.device,
+      ffmpegAvailable: health.ffmpeg_available,
+      modelLoaded: health.model_loaded,
+      queueSize: health.queue_size,
+      installState: (install?.state ?? 'installed') as
+        | 'installed'
+        | 'installing'
+        | 'failed'
+        | 'not_installed'
+        | 'unknown',
+      installProgress: install?.progress,
+      error: install?.state === 'failed' ? install.error ?? undefined : undefined,
+    };
+  } catch (error) {
+    separator = {
+      ...separator,
+      status: 'down',
+      healthy: false,
+      installState: 'unknown',
+      error: error instanceof Error ? error.message : '分离服务不可达',
+    };
+  }
+
+  res.json({ success: true, data: { backend, separator } });
 });
 
 export default router;

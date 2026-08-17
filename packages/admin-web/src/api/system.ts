@@ -43,6 +43,29 @@ export interface DashboardHistory {
   aiParse: number[];
 }
 
+export interface BackendHealth {
+  status: 'ok';
+  version: string;
+  uptimeSec: number;
+}
+
+export interface SeparatorHealth {
+  status: 'ok' | 'down' | 'installing';
+  healthy: boolean;
+  device?: string;
+  ffmpegAvailable?: boolean;
+  modelLoaded?: boolean;
+  queueSize?: number;
+  installState: 'installed' | 'installing' | 'failed' | 'not_installed' | 'unknown';
+  installProgress?: number;
+  error?: string;
+}
+
+export interface ServicesHealth {
+  backend: BackendHealth;
+  separator: SeparatorHealth;
+}
+
 export const systemApi = {
   getInfo: (): Promise<SystemInfo> =>
     client
@@ -55,5 +78,9 @@ export const systemApi = {
   getDashboardHistory: (): Promise<DashboardHistory> =>
     client
       .get<ApiResponse<DashboardHistory>>('/system/dashboard/history')
+      .then((res) => res.data.data),
+  getHealth: (): Promise<ServicesHealth> =>
+    client
+      .get<ApiResponse<ServicesHealth>>('/system/health')
       .then((res) => res.data.data),
 };

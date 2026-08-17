@@ -16,6 +16,7 @@ import {
   Activity,
   CalendarRange,
   CopyX,
+  Server,
   type LucideIcon,
 } from 'lucide-react';
 import Loading from '../components/Loading';
@@ -23,7 +24,7 @@ import Badge, { type BadgeVariant } from '../components/Badge';
 import Button from '../components/Button';
 import { scanApi } from '../api/scan';
 import { dedupApi, type DedupTaskItem } from '../api/dedup';
-import { systemApi, type DashboardStats, type DashboardHistory } from '../api/system';
+import { systemApi, type DashboardStats, type DashboardHistory, type ServicesHealth } from '../api/system';
 import type { ScanTask } from '../types';
 import { useCountUp } from '../hooks/useCountUp';
 
@@ -100,6 +101,66 @@ function SegmentBar({ segments }: { segments: { key: string; label: string; valu
             <span className="ml-auto font-mono text-ink">{item.value}</span>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function formatUptime(sec: number): string {
+  const d = Math.floor(sec / 86400);
+  const h = Math.floor((sec % 86400) / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  if (d > 0) return `${d} 天 ${h} 小时`;
+  if (h > 0) return `${h} 小时 ${m} 分`;
+  return `${m} 分钟`;
+}
+
+type HealthStatus = 'ok' | 'installing' | 'down';
+
+const HEALTH_VARIANT: Record<HealthStatus, { variant: BadgeVariant; label: string }> = {
+  ok: { variant: 'success', label: '正常' },
+  installing: { variant: 'warning', label: '安装中' },
+  down: { variant: 'danger', label: '异常' },
+};
+
+const HEALTH_COLOR: Record<HealthStatus, string> = {
+  ok: 'var(--color-success)',
+  installing: 'var(--color-warning)',
+  down: 'var(--color-danger)',
+};
+
+function ServiceHealthCard({
+  title,
+  icon: Icon,
+  status,
+  detail,
+  sub,
+}: {
+  title: string;
+  icon: LucideIcon;
+  status: HealthStatus;
+  detail: string;
+  sub?: string;
+}) {
+  const info = HEALTH_VARIANT[status];
+  const color = HEALTH_COLOR[status];
+  return (
+    <div className="bg-paper-2 border border-border rounded-lg p-lg flex items-center gap-md min-w-0 animate-hall-in">
+      <div
+        className="w-12 h-12 rounded-md flex items-center justify-center shrink-0"
+        style={{ backgroundColor: `color-mix(in oklch, ${color} 12%, transparent)`, color }}
+      >
+        <Icon className="w-6 h-6" aria-hidden="true" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-sm">
+          <span className="text-sm font-medium text-ink truncate">{title}</span>
+          <Badge variant={info.variant} dot>
+            {info.label}
+          </Badge>
+        </div>
+        <div className="text-xs text-ink-3 mt-1 truncate">{detail}</div>
+        {sub && <div className="text-xs text-ink-3 mt-0.5 truncate">{sub}</div>}
       </div>
     </div>
   );
@@ -382,6 +443,7 @@ export default function Dashboard() {
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [error, setError] = useState('');
   const [trendTab, setTrendTab] = useState<TrendKey>('playback');
+  const [health, setHealth] = useState<ServicesHealth | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -389,17 +451,19 @@ export default function Dashboard() {
       setLoading((prev) => !stats && prev);
       setError('');
       try {
-        const [dashboardRes, scanRes, dedupStatusRes, dedupTasksRes] = await Promise.all([
+        const [dashboardRes, scanRes, dedupStatusRes, dedupTasksRes, healthRes] = await Promise.all([
           systemApi.getDashboard(),
           scanApi.history({ limit: 5, offset: 0 }),
           dedupApi.status().catch(() => null),
           dedupApi.tasks(100).catch(() => []),
+          systemApi.getHealth().catch(() => null),
         ]);
         if (cancelled) return;
         setStats(dashboardRes);
         setScanTasks(scanRes.items ?? []);
         setDedupEnabled(dedupStatusRes?.lastResult?.enabled ?? null);
         setDedupTasks(dedupTasksRes);
+        setHealth(healthRes);
         setUpdatedAt(new Date());
       } catch (err) {
         if (cancelled) return;
@@ -527,12 +591,14 @@ export default function Dashboard() {
       scanApi.history({ limit: 5, offset: 0 }),
       dedupApi.status().catch(() => null),
       dedupApi.tasks(100).catch(() => []),
+      systemApi.getHealth().catch(() => null),
     ])
-      .then(([d, s, ds, dt]) => {
+      .then(([d, s, ds, dt, h]) => {
         setStats(d);
         setScanTasks(s.items ?? []);
         setDedupEnabled(ds?.lastResult?.enabled ?? null);
         setDedupTasks(dt);
+        setHealth(h);
         setUpdatedAt(new Date());
       })
       .catch((err) => setError(err instanceof Error ? err.message : '刷新失败'));
@@ -590,6 +656,43 @@ export default function Dashboard() {
               );
             })}
           </section>
+
+          {/* 服务健康：后端 API + 人声分离服务（随仪表盘 10s 轮询刷新） */}
+          {health && (
+            <section className="grid grid-cols-1 sm:grid-cols-2 gap-md animate-hall-in-delay-1">
+              <ServiceHealthCard
+                title="后端服务"
+                icon={Server}
+                status="ok"
+                detail={`v${health.backend.version} · 已运行 ${formatUptime(health.backend.uptimeSec)}`}
+              />
+              {(() => {
+                const sep = health.separator;
+                let detail = '';
+                let sub: string | undefined;
+                if (sep.status === 'down') {
+                  detail = sep.error ?? '分离服务不可达';
+                } else {
+                  const device = sep.device ? `设备 ${sep.device}` : '设备 —';
+                  detail = `${device} · ffmpeg ${sep.ffmpegAvailable ? '就绪' : '缺失'} · 模型 ${sep.modelLoaded ? '已加载' : '未加载'}`;
+                  if (sep.status === 'installing') {
+                    sub = `依赖安装中 ${Math.round(sep.installProgress ?? 0)}%`;
+                  } else if (sep.installState === 'failed') {
+                    sub = sep.error ? `安装失败：${sep.error}` : '依赖安装失败';
+                  }
+                }
+                return (
+                  <ServiceHealthCard
+                    title="人声分离服务"
+                    icon={Waves}
+                    status={sep.status}
+                    detail={detail}
+                    sub={sub}
+                  />
+                );
+              })()}
+            </section>
+          )}
 
           {/* 近 14 天趋势：大图（指标切换）+ 三张汇总卡 */}
           {history && (

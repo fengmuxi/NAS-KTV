@@ -173,6 +173,16 @@ class SeparatorClient {
     }
   }
 
+  /** 返回分离服务原始健康详情；服务不可达时抛错（由调用方判定为 down）。 */
+  async getHealth(): Promise<SeparationHealthResponse> {
+    return this.request<SeparationHealthResponse>(
+      'GET',
+      '/api/health',
+      undefined,
+      5000,
+    );
+  }
+
   async getGpuInfo(): Promise<GpuInfo> {
     return this.request<GpuInfo>('GET', '/api/gpu/info', undefined, INSTALL_TIMEOUT_MS);
   }
