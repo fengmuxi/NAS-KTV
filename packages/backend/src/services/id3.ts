@@ -17,6 +17,8 @@ export interface AudioTags {
   sampleRate: number;
   channels: number;
   lossless: boolean;
+  /** 内嵌歌词（ID3 USLT / m4a ©lyr / 等），多条（原文+翻译）以换行合并；无则为 null */
+  lyrics?: string | null;
 }
 
 export const AUDIO_EXTENSIONS = ['.mp3', '.flac', '.m4a', '.wav', '.aac', '.ogg', '.wma'];
@@ -73,7 +75,10 @@ export async function parseAudioTags(filePath: string): Promise<AudioTags | null
       bitrate: format.bitrate || 0,
       sampleRate: format.sampleRate || 0,
       channels: format.numberOfChannels || 2,
-      lossless: format.lossless || false
+      lossless: format.lossless || false,
+      // 内嵌歌词：music-metadata 把 USLT/©lyr 等归一为 string[]（原文+翻译等多条），
+      // 以换行合并为单段；空数组/无则置 null
+      lyrics: common.lyrics && common.lyrics.length > 0 ? common.lyrics.join('\n') : null
     };
   } catch (error) {
     logger.error(`Failed to parse audio tags: ${filePath}`, error);

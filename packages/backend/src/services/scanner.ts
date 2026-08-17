@@ -7,6 +7,7 @@ import logger from '../logger';
 import { db, schema } from '../db';
 import { eq, and, or, isNull } from 'drizzle-orm';
 import { parseAudioTags, getFileType, isMediaFile, AudioTags } from './id3';
+import { config } from '../config';
 import { getPinyin, getFirstLetter } from '@nasktv/shared';
 import {
   parseSongInfo,
@@ -296,8 +297,28 @@ export async function processMediaFile(filePath: string, options?: { skipDedup?:
       .where(eq(schema.songs.filePath, filePath))
       .limit(1);
 
-    // 如果文件路径已存在，跳过
+    // 如果文件路径已存在：增量补全缺失的内嵌歌词（不影响其它字段），
+    // 使重扫一次即可为老歌补齐歌词；已有 lyricsPath 的歌直接跳过，零开销
     if (existingSong.length > 0) {
+      const song = existingSong[0];
+      if (!song.lyricsPath && fileType === 'audio') {
+        try {
+          const tags = await parseAudioTags(filePath);
+          if (tags?.lyrics) {
+            await fs.mkdir(config.lyricsDir, { recursive: true });
+            const embeddedPath = path.join(config.lyricsDir, `${song.id}.lrc`);
+            await fs.writeFile(embeddedPath, tags.lyrics, 'utf-8');
+            await db
+              .update(schema.songs)
+              .set({ lyricsPath: embeddedPath })
+              .where(eq(schema.songs.id, song.id));
+            logger.info(`Backfilled embedded lyrics for existing song ${song.id} (${song.title})`);
+            return { status: 'updated', songId: song.id };
+          }
+        } catch (err) {
+          logger.warn(`Failed to backfill embedded lyrics for ${filePath}:`, err);
+        }
+      }
       return { status: 'skipped', reason: '文件已存在' };
     }
 
@@ -352,7 +373,7 @@ export async function processMediaFile(filePath: string, options?: { skipDedup?:
       artistIds.push(artistId);
     }
 
-    // 检查歌词文件
+    // 检查歌词文件（外部同名 .lrc 优先于内嵌歌词）
     const lyricsPath = await checkLyricsFile(filePath);
 
     // 创建歌曲记录
@@ -366,9 +387,27 @@ export async function processMediaFile(filePath: string, options?: { skipDedup?:
         duration: tags?.duration || 0,
         lyricsPath: lyricsPath,
         fileHash: fileHash,
-        rawTags: tags ? JSON.stringify(tags) : null
+        // rawTags 仅作标签快照，剥离 lyrics 字段避免整段歌词撑大 DB
+        rawTags: tags ? JSON.stringify({ ...tags, lyrics: undefined }) : null
       })
       .returning();
+
+    // 内嵌歌词落地：无外部 .lrc 时，把 ID3/m4a 内嵌歌词写入 data/lyrics/<id>.lrc
+    // 并回写 lyricsPath；前端 GET /lyrics 无感知（统一管理目录，与 Admin 手动保存一致）
+    if (!lyricsPath && tags?.lyrics) {
+      try {
+        await fs.mkdir(config.lyricsDir, { recursive: true });
+        const embeddedLyricsPath = path.join(config.lyricsDir, `${newSong.id}.lrc`);
+        await fs.writeFile(embeddedLyricsPath, tags.lyrics, 'utf-8');
+        await db
+          .update(schema.songs)
+          .set({ lyricsPath: embeddedLyricsPath })
+          .where(eq(schema.songs.id, newSong.id));
+        logger.info(`Extracted embedded lyrics for song ${newSong.id} (${title})`);
+      } catch (err) {
+        logger.warn(`Failed to extract embedded lyrics for ${filePath}:`, err);
+      }
+    }
 
     // 写入全部歌手关联（主歌手 + 合作歌手）
     await setSongArtists(newSong.id, artistIds);
