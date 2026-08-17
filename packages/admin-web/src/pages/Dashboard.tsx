@@ -580,13 +580,16 @@ export default function Dashboard() {
   const handleRefresh = () => {
     setRefreshing(true);
     setError('');
+    // 最短可见时长：本地后端响应极快（<16ms），若不兜底，refreshing 在浏览器
+    // 绘制前就被设回 false，用户完全看不到旋转动画。强制 spinner 至少展示 400ms。
+    const minSpinner = new Promise<void>((resolve) => setTimeout(resolve, 400));
     // 手动刷新同时拉取历史趋势
-    Promise.all([systemApi.getDashboardHistory()])
-      .then(([h]) => setHistory(h))
-      .catch(() => {})
-      .finally(() => setRefreshing(false));
+    const historyReq = systemApi
+      .getDashboardHistory()
+      .then((h) => setHistory(h))
+      .catch(() => {});
     // 触发主数据轮询（通过重新挂载不优雅，直接并行请求一次）
-    Promise.all([
+    const mainReq = Promise.all([
       systemApi.getDashboard(),
       scanApi.history({ limit: 5, offset: 0 }),
       dedupApi.status().catch(() => null),
@@ -602,6 +605,10 @@ export default function Dashboard() {
         setUpdatedAt(new Date());
       })
       .catch((err) => setError(err instanceof Error ? err.message : '刷新失败'));
+    // 数据与最短时长都完成才结束旋转，保证用户能感知到刷新动作
+    Promise.all([historyReq, mainReq, minSpinner]).finally(() =>
+      setRefreshing(false),
+    );
   };
 
   return (
