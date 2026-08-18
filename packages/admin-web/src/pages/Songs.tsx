@@ -126,6 +126,22 @@ export default function Songs() {
   const [deleting, setDeleting] = useState(false);
   const [clearLyricsConfirmOpen, setClearLyricsConfirmOpen] = useState(false);
 
+  // 单首 AI 解析 / 人声分离二次确认
+  const [pendingAiParse, setPendingAiParse] = useState<Song | null>(null);
+  const [pendingSeparation, setPendingSeparation] = useState<Song | null>(null);
+
+  const confirmAiParse = () => {
+    const s = pendingAiParse;
+    setPendingAiParse(null);
+    if (s) triggerAiParse(s);
+  };
+
+  const confirmSeparation = () => {
+    const s = pendingSeparation;
+    setPendingSeparation(null);
+    if (s) triggerSeparation(s);
+  };
+
   const setPendingDelete = useCallback((v: { songs: Song[]; count: number } | null) => {
     pendingDeleteRef.current = v;
     setPendingDeleteState(v);
@@ -867,7 +883,7 @@ export default function Songs() {
                             <Trash2 className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => triggerAiParse(song)}
+                            onClick={() => setPendingAiParse(song)}
                             disabled={busy}
                             className="p-1.5 rounded-md text-ink-2 hover:text-accent hover:bg-paper-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors disabled:opacity-50"
                             aria-label="AI 解析"
@@ -876,7 +892,7 @@ export default function Songs() {
                             <Bot className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => triggerSeparation(song)}
+                            onClick={() => setPendingSeparation(song)}
                             disabled={busy}
                             className="p-1.5 rounded-md text-ink-2 hover:text-accent hover:bg-paper-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors disabled:opacity-50"
                             aria-label="人声分离"
@@ -1090,6 +1106,42 @@ export default function Songs() {
         loading={lyricsSaving}
         onConfirm={confirmClearLyrics}
         onCancel={() => setClearLyricsConfirmOpen(false)}
+      />
+
+      {/* 单首 AI 解析确认弹窗 */}
+      <ConfirmModal
+        isOpen={!!pendingAiParse}
+        title="确认 AI 解析"
+        danger={false}
+        confirmLabel="开始解析"
+        message={
+          pendingAiParse ? (
+            <>
+              确定要对《<strong className="text-ink">{pendingAiParse.title}</strong>
+              》进行 AI 解析吗？若已解析过，将覆盖现有解析结果。
+            </>
+          ) : null
+        }
+        onConfirm={confirmAiParse}
+        onCancel={() => setPendingAiParse(null)}
+      />
+
+      {/* 单首人声分离确认弹窗 */}
+      <ConfirmModal
+        isOpen={!!pendingSeparation}
+        title="确认人声分离"
+        danger={false}
+        confirmLabel="开始分离"
+        message={
+          pendingSeparation ? (
+            <>
+              确定要对《<strong className="text-ink">{pendingSeparation.title}</strong>
+              》进行人声分离吗？若已分离过，将覆盖现有分离音频。
+            </>
+          ) : null
+        }
+        onConfirm={confirmSeparation}
+        onCancel={() => setPendingSeparation(null)}
       />
 
       {previewSong && (
