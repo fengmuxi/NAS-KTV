@@ -845,41 +845,23 @@ export default function Devices() {
         )}
       </div>
 
-      {/* 分页信息栏：始终显示，让用户明确知道分页功能存在 */}
+      {/* 分页栏：计数 + 统一分页组件（含每页条数选择） */}
       {!loading && (
         <div className="flex items-center justify-between gap-md mt-md flex-wrap">
-          <div className="flex items-center gap-sm text-sm text-ink-3">
-            <span>
-              第 {page}/{totalPages} 页，共 {total} 条
-            </span>
-            <span className="text-ink-4">·</span>
-            <label className="flex items-center gap-xs">
-              <span>每页</span>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setPage(1);
-                }}
-                className="border border-border rounded-md px-2 py-1 text-sm bg-paper text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                aria-label="每页显示条数"
-              >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-              <span>条</span>
-            </label>
-          </div>
-          {totalPages > 1 && (
-            <Pagination
-              currentPage={page}
-              totalPages={totalPages}
-              onPageChange={setPage}
-              state={loading ? 'loading' : 'default'}
-            />
-          )}
+          <span className="text-sm text-ink-3">
+            第 {page}/{totalPages} 页，共 {total} 条
+          </span>
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            state={loading ? 'loading' : 'default'}
+            pageSize={pageSize}
+            onPageSizeChange={(s) => {
+              setPageSize(s);
+              setPage(1);
+            }}
+          />
         </div>
       )}
 

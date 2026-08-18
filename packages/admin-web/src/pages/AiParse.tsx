@@ -40,8 +40,6 @@ import Loading from '../components/Loading';
 import Pagination from '../components/Pagination';
 import { useToast } from '../components/Toast';
 
-const PAGE_SIZE = 20;
-
 const statusVariantMap: Record<string, 'neutral' | 'info' | 'success' | 'danger' | 'warning'> = {
   pending: 'neutral',
   processing: 'info',
@@ -202,6 +200,7 @@ export default function AiParse() {
   const [tasksLoading, setTasksLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
   const [batchRetrying, setBatchRetrying] = useState(false);
@@ -263,8 +262,8 @@ export default function AiParse() {
     setTasksLoading(true);
     try {
       const params: { limit: number; offset: number; status?: string } = {
-        limit: PAGE_SIZE,
-        offset: (page - 1) * PAGE_SIZE,
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
       };
       if (statusFilter !== 'all' && statusFilter !== 'need_review') {
         params.status = statusFilter;
@@ -282,7 +281,7 @@ export default function AiParse() {
     } finally {
       setTasksLoading(false);
     }
-  }, [page, statusFilter, showToast]);
+  }, [page, pageSize, statusFilter, showToast]);
 
   useEffect(() => {
     loadConfig();
@@ -320,7 +319,7 @@ export default function AiParse() {
   }, [page]);
 
   const totalPages = Math.max(1, Math.ceil(
-    (statusFilter === 'need_review' ? stats.needReview : total) / PAGE_SIZE
+    (statusFilter === 'need_review' ? stats.needReview : total) / pageSize
   ));
 
   const handleSaveConfig = async () => {
@@ -1093,12 +1092,17 @@ export default function AiParse() {
           </div>
         )}
 
-        {totalPages > 1 && (
+        {total > 0 && (
           <div className="px-md pb-md">
             <Pagination
               currentPage={page}
               totalPages={totalPages}
               onPageChange={setPage}
+              pageSize={pageSize}
+              onPageSizeChange={(s) => {
+                setPageSize(s);
+                setPage(1);
+              }}
             />
           </div>
         )}

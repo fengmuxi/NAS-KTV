@@ -28,6 +28,7 @@ import Modal from '../components/Modal';
 import Loading from '../components/Loading';
 import AudioPreviewModal from '../components/AudioPreviewModal';
 import { useToast } from '../components/Toast';
+import Pagination from '../components/Pagination';
 import { SEPARATION_MODELS, separationModelLabel } from '../constants';
 
 type TaskStatus = 'pending' | 'processing' | 'completed' | 'failed';
@@ -72,8 +73,6 @@ function isKnownStatus(s: string): s is TaskStatus {
   return Object.prototype.hasOwnProperty.call(statusLabel, s);
 }
 
-const PAGE_SIZE = 20;
-
 const filterTabs: { value: string; label: string }[] = [
   { value: 'all', label: '全部' },
   { value: 'pending', label: '待处理' },
@@ -102,6 +101,7 @@ export default function Separation() {
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
   const [batchRetrying, setBatchRetrying] = useState(false);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [total, setTotal] = useState(0);
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -123,7 +123,7 @@ export default function Separation() {
   const { showToast, ToastContainer } = useToast();
 
   const hasProcessing = tasks.some(t => t.status === 'processing');
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const songTotalPages = Math.max(1, Math.ceil(songTotal / 10));
 
   const loadTasks = useCallback(async () => {
@@ -131,7 +131,7 @@ export default function Separation() {
     try {
       const params: { page: number; pageSize: number; status?: string } = {
         page,
-        pageSize: PAGE_SIZE,
+        pageSize,
       };
       if (statusFilter !== 'all') params.status = statusFilter;
       const res = await separationApi.getTasks(params);
@@ -143,7 +143,7 @@ export default function Separation() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter, showToast]);
+  }, [page, pageSize, statusFilter, showToast]);
 
   useEffect(() => {
     loadTasks();
@@ -793,31 +793,19 @@ export default function Separation() {
         )}
 
         {total > 0 && (
-          <div className="flex items-center justify-between px-md py-sm border-t border-border flex-wrap gap-sm">
-            <span className="text-xs text-ink-3">共 {total} 条任务</span>
-            <div className="flex items-center gap-xs">
-              <Button
-                size="sm"
-                variant="ghost"
-                leftIcon={<ChevronLeft className="w-4 h-4" />}
-                disabled={page <= 1}
-                onClick={() => setPage(p => p - 1)}
-              >
-                上一页
-              </Button>
-              <span className="text-sm text-ink-2 px-sm">
-                第 {page} 页，共 {totalPages} 页
-              </span>
-              <Button
-                size="sm"
-                variant="ghost"
-                rightIcon={<ChevronRight className="w-4 h-4" />}
-                disabled={page >= totalPages}
-                onClick={() => setPage(p => p + 1)}
-              >
-                下一页
-              </Button>
-            </div>
+          <div className="border-t border-border">
+            <div className="px-md pt-sm text-xs text-ink-3">共 {total} 条任务</div>
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              state={loading ? 'loading' : 'default'}
+              pageSize={pageSize}
+              onPageSizeChange={(s) => {
+                setPageSize(s);
+                setPage(1);
+              }}
+            />
           </div>
         )}
       </div>

@@ -31,8 +31,8 @@ import { dedupApi, type DedupTaskItem } from '../api/dedup';
 import { useToast } from '../components/Toast';
 import type { ScanTask } from '../types';
 
-const PAGE_SIZE = 10;
-const RESULT_PAGE_SIZE = 20;
+const DEFAULT_HISTORY_PAGE_SIZE = 10;
+const DEFAULT_RESULT_PAGE_SIZE = 20;
 
 const RESULT_STATUS_META: Record<ScanResultItem['status'], { label: string; color: string }> = {
   new: { label: '新增', color: 'text-success' },
@@ -182,11 +182,13 @@ export default function Scan() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(DEFAULT_HISTORY_PAGE_SIZE);
   const [totalHistory, setTotalHistory] = useState(0);
   const [selectedTask, setSelectedTask] = useState<ScanTask | null>(null);
   const [results, setResults] = useState<ScanResultsResponse | null>(null);
   const [resultFilter, setResultFilter] = useState<ResultFilter>('');
   const [resultPage, setResultPage] = useState(1);
+  const [resultPageSize, setResultPageSize] = useState(DEFAULT_RESULT_PAGE_SIZE);
   const [resultsLoading, setResultsLoading] = useState(false);
 
   const reconnectTimerRef = useRef<number | null>(null);
@@ -199,8 +201,8 @@ export default function Scan() {
       setHistoryError(null);
       try {
         const res = await scanApi.history({
-          limit: PAGE_SIZE,
-          offset: (targetPage - 1) * PAGE_SIZE,
+          limit: historyPageSize,
+          offset: (targetPage - 1) * historyPageSize,
         });
         setHistoryItems(res.items);
         setTotalHistory(res.total);
@@ -210,7 +212,7 @@ export default function Scan() {
         setHistoryLoading(false);
       }
     },
-    [page]
+    [page, historyPageSize]
   );
 
   loadHistoryRef.current = loadHistory;
@@ -287,8 +289,8 @@ export default function Scan() {
     scanApi
       .results(scanId, {
         status: resultFilter || undefined,
-        limit: RESULT_PAGE_SIZE,
-        offset: (resultPage - 1) * RESULT_PAGE_SIZE,
+        limit: resultPageSize,
+        offset: (resultPage - 1) * resultPageSize,
       })
       .then((r) => {
         if (!cancelled) setResults(r);
@@ -302,7 +304,7 @@ export default function Scan() {
     return () => {
       cancelled = true;
     };
-  }, [selectedTask?.id, resultFilter, resultPage]);
+  }, [selectedTask?.id, resultFilter, resultPage, resultPageSize]);
 
   const handleOpenDetail = (task: ScanTask) => {
     setResults(null);
@@ -765,13 +767,18 @@ export default function Scan() {
         {!historyLoading && !historyError && totalHistory > 0 && (
           <div className="px-md py-sm border-t border-border flex items-center justify-between gap-md flex-wrap">
             <span className="text-sm text-ink-3">
-              第 {page}/{Math.max(1, Math.ceil(totalHistory / PAGE_SIZE))} 页，共{' '}
+              第 {page}/{Math.max(1, Math.ceil(totalHistory / historyPageSize))} 页，共{' '}
               {totalHistory} 条
             </span>
             <Pagination
               currentPage={page}
-              totalPages={Math.max(1, Math.ceil(totalHistory / PAGE_SIZE))}
+              totalPages={Math.max(1, Math.ceil(totalHistory / historyPageSize))}
               onPageChange={setPage}
+              pageSize={historyPageSize}
+              onPageSizeChange={(s) => {
+                setHistoryPageSize(s);
+                setPage(1);
+              }}
               state={historyLoading ? 'loading' : 'default'}
             />
           </div>
@@ -905,11 +912,16 @@ export default function Scan() {
                   ))}
                 </ul>
               )}
-              {results && results.total > RESULT_PAGE_SIZE && (
+              {results && results.total > 0 && (
                 <Pagination
                   currentPage={resultPage}
-                  totalPages={Math.ceil(results.total / RESULT_PAGE_SIZE)}
+                  totalPages={Math.max(1, Math.ceil(results.total / resultPageSize))}
                   onPageChange={setResultPage}
+                  pageSize={resultPageSize}
+                  onPageSizeChange={(s) => {
+                    setResultPageSize(s);
+                    setResultPage(1);
+                  }}
                   state={resultsLoading ? 'loading' : 'default'}
                 />
               )}

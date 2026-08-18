@@ -13,7 +13,6 @@ import Pagination from '../components/Pagination';
 import Loading from '../components/Loading';
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-const PAGE_SIZE = 24;
 
 const sortArtists = (list: Artist[]) =>
   [...list].sort((a, b) => {
@@ -32,6 +31,7 @@ export default function Artists() {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [total, setTotal] = useState(0);
   const [selectedLetter, setSelectedLetter] = useState<string | null>(null);
 
@@ -66,7 +66,7 @@ export default function Artists() {
     try {
       const res = await artistsApi.list({
         page,
-        pageSize: PAGE_SIZE,
+        pageSize,
         keyword: search || undefined,
       });
       setArtists(res.items);
@@ -82,7 +82,7 @@ export default function Artists() {
     fetchArtists();
   }, [fetchArtists]);
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const displayed = selectedLetter
     ? sortArtists(
@@ -388,6 +388,11 @@ export default function Artists() {
           currentPage={page}
           totalPages={totalPages}
           onPageChange={setPage}
+          pageSize={pageSize}
+          onPageSizeChange={(s) => {
+            setPageSize(s);
+            setPage(1);
+          }}
         />
       )}
 

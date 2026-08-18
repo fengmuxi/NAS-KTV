@@ -23,8 +23,6 @@ import { artistsApi } from '../api/artists';
 import { categoriesApi } from '../api/categories';
 import type { Song, Artist, CategoryGroup } from '../types';
 
-const PAGE_SIZE = 20;
-
 function formatDuration(sec: number): string {
   const s = Math.max(0, Math.floor(sec || 0));
   const m = Math.floor(s / 60);
@@ -88,6 +86,7 @@ export default function Songs() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -132,7 +131,7 @@ export default function Songs() {
   }, []);
 
   const allCheckboxRef = useRef<HTMLInputElement | null>(null);
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   // Load category groups
   useEffect(() => {
@@ -175,7 +174,7 @@ export default function Songs() {
       try {
         const data = await songsApi.list({
           page,
-          pageSize: PAGE_SIZE,
+          pageSize,
           keyword: keyword.trim() || undefined,
           artistId: artistId ?? undefined,
           categoryItemIds: selectedCategoryItemIds.size > 0 ? Array.from(selectedCategoryItemIds) : undefined,
@@ -890,7 +889,7 @@ export default function Songs() {
       {/* Pagination */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-md">
         <p className="text-sm text-ink-3">
-          共 {total} 条 · 第 {page}/{totalPages} 页 · 每页 {PAGE_SIZE} 条
+          共 {total} 条 · 第 {page}/{totalPages} 页 · 每页 {pageSize} 条
         </p>
         <div className="flex justify-end">
           <Pagination
@@ -898,6 +897,11 @@ export default function Songs() {
             totalPages={totalPages}
             onPageChange={setPage}
             state={loading ? 'loading' : 'default'}
+            pageSize={pageSize}
+            onPageSizeChange={(s) => {
+              setPageSize(s);
+              setPage(1);
+            }}
           />
         </div>
       </div>
