@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   Search,
+  SearchX,
   Download as DownloadIcon,
   X,
   CheckCircle2,
@@ -10,6 +11,7 @@ import {
   Clock,
 } from 'lucide-react';
 import Button from '../components/Button';
+import EmptyState from '../components/EmptyState';
 import { downloadApi, type PlatformInfo, type SongDescriptor, type TaskStatus, type SearchResultResponse } from '../api/download';
 
 /* Hallmark · component: page · genre: modern-minimal · theme: Cobalt
@@ -97,6 +99,7 @@ export default function Download() {
   const [tasks, setTasks] = useState<Record<string, TaskStatus>>({});
   const [detailOpen, setDetailOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searched, setSearched] = useState(false);
   const pollRef = useRef<number | null>(null);
   const searchPollRef = useRef<number | null>(null);
 
@@ -209,6 +212,7 @@ export default function Download() {
     setError(null);
     setResults([]);
     setSelectedKeys(new Set());
+    setSearched(true);
     try {
       const sources = platforms.filter((p) => selectedSources.has(p.key)).map((p) => p.key);
       const data = await downloadApi.searchSubmit(keyword.trim(), sources.length ? sources : undefined);
@@ -377,6 +381,27 @@ export default function Download() {
           <Loader2 className="w-4 h-4 animate-spin text-accent" />
           正在搜索各大音源，请稍候（慢源可能需数十秒）…
         </div>
+      )}
+
+      {/* 空结果 / 初始引导 */}
+      {!searching && results.length === 0 && (
+        searched ? (
+          <div className="rounded-lg border border-border bg-paper">
+            <EmptyState
+              icon={<SearchX className="w-8 h-8" />}
+              title="未找到相关歌曲"
+              description="换个关键词，或在上方多勾选几个音乐平台后重试"
+            />
+          </div>
+        ) : (
+          <div className="rounded-lg border border-border bg-paper">
+            <EmptyState
+              icon={<Search className="w-8 h-8" />}
+              title="输入歌名或歌手开始搜索"
+              description="勾选上方音乐平台后，输入关键词即可检索可下载的音源"
+            />
+          </div>
+        )
       )}
 
       {/* 结果表 */}
