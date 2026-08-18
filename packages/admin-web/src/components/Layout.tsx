@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useUiStore } from '../stores/ui';
 import { useAuthStore } from '../stores/auth';
+import BackendOfflineBanner from './BackendOfflineBanner';
 
 /* Hallmark · component: layout · genre: modern-minimal · theme: Cobalt
  * states: default · hover · focus-visible · active · disabled (n/a) · loading (n/a) · error (n/a) · success (n/a)
@@ -245,6 +246,7 @@ export default function Layout({ children }: { children?: ReactNode }) {
         </header>
 
         {/* Content */}
+        <BackendOfflineBanner />
         <main className="p-4 lg:p-6">{children ?? <Outlet />}</main>
       </div>
     </div>

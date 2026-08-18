@@ -23,8 +23,14 @@ export default function Login() {
       navigate('/', { replace: true });
     } catch (err) {
       if (axios.isAxiosError(err)) {
-        const data = err.response?.data;
-        setError(data?.error || data?.message || '登录失败，请检查用户名和密码');
+        // 无响应对象 = 请求未到达后端（网络断开 / 服务未启动 / CORS），
+        // 此时不应误导为「用户名密码错误」
+        if (!err.response) {
+          setError('无法连接后端服务，请确认后端已启动且网络可访问');
+        } else {
+          const data = err.response.data;
+          setError(data?.error || data?.message || '登录失败，请检查用户名和密码');
+        }
       } else {
         setError('登录失败，请检查用户名和密码');
       }
