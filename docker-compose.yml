@@ -29,8 +29,11 @@ services:
       - AI_MODEL=${AI_MODEL:-gpt-4o-mini}
       - AI_PARSE_CONCURRENCY=${AI_PARSE_CONCURRENCY:-2}
       - AI_AUTO_PARSE_AFTER_SCAN=${AI_AUTO_PARSE_AFTER_SCAN:-true}
+      - DOWNLOADER_SERVICE_URL=${DOWNLOADER_SERVICE_URL:-http://downloader:8002}
     depends_on:
       separator:
+        condition: service_started
+      downloader:
         condition: service_started
     restart: unless-stopped
     healthcheck:
@@ -65,6 +68,21 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    restart: unless-stopped
+
+  # ==================== 歌曲下载微服务（Python + musicdl，8 源搜索下载）====================
+  downloader:
+    build:
+      context: ./packages/downloader
+      dockerfile: Dockerfile
+    container_name: nasktv-downloader
+    volumes:
+      - ./data/songs:/app/data/songs
+      - ./data/downloader-cache:/app/data/downloader-cache
+    environment:
+      - DOWNLOAD_DIR=/app/data/songs/Downloads
+      - DOWNLOAD_CONCURRENCY=${DOWNLOAD_CONCURRENCY:-2}
+      - ENABLED_SOURCES=${ENABLED_SOURCES:-qq,kugou,kuwo,netease,soda,fivesing,bodian}
     restart: unless-stopped
 
   # ==================== 前端（admin-web + mobile-h5 合并托管 + 反代）====================

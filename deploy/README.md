@@ -13,8 +13,9 @@
 | TV App | 电视播放器 | Tauri 2 (Rust) + React WebView |
 | Backend | API + WebSocket | Node.js 20 + Express + SQLite |
 | Separator | 人声分离微服务 | Python 3.12 + FastAPI + Demucs v4 |
+| Downloader | 歌曲下载微服务 | Python 3.11 + FastAPI + musicdl |
 
-pnpm workspace monorepo，所有子包位于 `packages/` 目录下。
+pnpm workspace monorepo，所有子包位于 `packages/` 目录下。生产部署由 4 个服务组成：`backend` / `separator` / `downloader` / `web`（详见第三节）。
 
 ---
 
@@ -50,7 +51,7 @@ pnpm workspace monorepo，所有子包位于 `packages/` 目录下。
 
 ### 3.2 部署架构
 
-系统由 5 个 Docker 服务组成，通过 `web` 反向代理对外提供统一入口（8080 端口）：
+系统由 4 个 Docker 服务组成，通过 `web` 反向代理对外提供统一入口（8080 端口）：
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -64,15 +65,17 @@ pnpm workspace monorepo，所有子包位于 `packages/` 目录下。
 │  └─────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────┘
          │
-    ┌────┴────┐
-    │ backend │ ──→ separator:8001 (容器内通信)
-    └─────────┘
+    ┌────┴────────────┐
+    │ backend         │ ──→ separator:8001  (人声分离，容器内通信)
+    │                 │ ──→ downloader:8002 (歌曲下载，容器内通信)
+    └─────────────────┘
 ```
 
 | 服务 | 技术栈 | 容器内端口 | 对外暴露 | 说明 |
 |------|--------|-----------|---------|------|
 | `backend` | Node.js + Express | 3000 | 3000（可选调试） | API + WebSocket |
 | `separator` | Python + Demucs | 8001 | 无 | 人声分离，仅容器内通信 |
+| `downloader` | Python + musicdl | 8002 | 无 | 歌曲下载（QQ/酷狗/酷我/网易云/汽水/5SING/波点），仅容器内通信 |
 | `admin-web` | React SPA + nginx | 80 | 无（通过 web） | 管理后台静态托管 |
 | `mobile-h5` | React SPA + nginx | 80 | 无（通过 web） | 手机点歌 H5 静态托管 |
 | `web` | nginx:alpine | 80 | 8080 | 反向代理，统一对外入口 |
@@ -86,6 +89,7 @@ pnpm workspace monorepo，所有子包位于 `packages/` 目录下。
 | `data/separation` | `/app/data/separation` | 分离结果输出 | backend、separator（读写共享） |
 | `data/uploads` | `/app/data/uploads` | 上传临时目录 | backend（读写） |
 | `data/separator-cache` | `/app/cache` | Demucs 模型缓存（~80MB） | separator（读写） |
+| `data/downloader-cache` | `/app/data/downloader-cache` | 下载器运行缓存（搜索结果/临时态） | downloader（读写） |
 
 > **重要**：`data/db` 和 `data/songs` 是核心数据，必须备份。
 
@@ -107,7 +111,7 @@ vi .env
 #   AI_API_KEY=<你的 API Key>
 
 # 3. 创建数据目录
-mkdir -p data/{db,songs,separation,uploads,separator-cache}
+mkdir -p data/{db,songs,separation,uploads,separator-cache,downloader-cache}
 
 # 4. 将歌曲文件放入 data/songs/（可选，也可通过后台上传）
 cp /path/to/your/songs/*.mp3 data/songs/
@@ -121,6 +125,7 @@ docker compose ps
 # 7. 查看日志确认无错误
 docker compose logs -f backend
 docker compose logs -f separator
+docker compose logs -f downloader
 ```
 
 ### 3.5 生产环境访问地址
@@ -178,6 +183,14 @@ docker compose logs -f separator
 | `AI_MODEL` | `gpt-4o-mini` | 模型名称 | 否 |
 | `AI_AUTO_PARSE_AFTER_SCAN` | `true` | 扫描后自动解析 | 否 |
 
+#### 歌曲下载
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `DOWNLOADER_SERVICE_URL` | `http://downloader:8002` | 下载服务地址（Docker 自动设为容器名） |
+| `DOWNLOAD_CONCURRENCY` | `2` | 最大并发下载数（防止压垮人声分离队列） |
+| `ENABLED_SOURCES` | 留空（启用全部） | 启用的音乐平台源，逗号分隔的 musicdl 短名：`qq,kugou,kuwo,netease,soda,fivesing,bodian` |
+
 兼容的 AI 服务商：OpenAI / DeepSeek / 通义千问 / Moonshot / 本地 Ollama 等。
 
 ---
@@ -203,11 +216,13 @@ docker compose ps
 # 查看某个服务的实时日志
 docker compose logs -f backend
 docker compose logs -f separator
+docker compose logs -f downloader
 docker compose logs -f web
 
 # 进入容器调试
 docker compose exec backend sh
 docker compose exec separator bash
+docker compose exec downloader bash
 
 # 查看资源占用
 docker stats
@@ -227,6 +242,7 @@ docker stats
 
 - `data/separation/` — 分离结果（丢失后可重新触发分离任务生成）
 - `data/separator-cache/` — 模型缓存（丢失后需重新下载约 80MB）
+- `data/downloader-cache/` — 下载器运行缓存（丢失无影响，下次运行自动重建）
 
 ### 备份命令
 
@@ -267,6 +283,7 @@ docker compose up -d --build
 
 # 5. 查看日志确认无错误
 docker compose logs -f backend
+docker compose logs -f downloader
 ```
 
 > 数据卷自动保留，无需手动迁移。如 schema 有变更，backend 启动时会自动执行迁移。
@@ -315,6 +332,15 @@ docker compose exec separator ffmpeg -version
 
 # 确认音频格式受支持：mp3, flac, m4a, wav, ogg, mp4, mkv
 ```
+
+### 7.6 下载任务失败 / 搜索无结果
+
+- 下载器依赖第三方音乐解析源，**稳定性随平台政策变动**，部分歌曲/平台可能临时不可用，属正常现象
+- 先在管理后台「歌曲下载」页确认勾选的平台中是否有可用源；若所有源都失败，多为解析源整体抖动，稍后重试
+- 查看下载器日志：`docker compose logs -f downloader`
+- 检查下载目录权限：`docker compose exec downloader ls -l /app/data/songs/Downloads`
+- 重新构建（改动依赖后）：`docker compose up -d --build downloader`
+- 歌词缺失：部分平台常无 LRC 歌词，与 KTV 同步歌词弱冲突，可手动在后台补歌词
 
 #### torchaudio 后端降级
 

@@ -7,6 +7,7 @@ import { authenticateToken } from '../middleware/jwt';
 import { db, schema } from '../db';
 import { sql, gte, eq, desc } from 'drizzle-orm';
 import { separatorClient } from '../services/separator-client';
+import { downloaderClient } from '../services/downloader-client';
 
 const router = Router();
 
@@ -336,7 +337,8 @@ router.get('/info', authenticateToken, async (req: Request, res: Response) => {
 /**
  * GET /system/health - 各服务健康状态聚合（后台首页「服务健康」模块使用）
  * 后端自身始终为 ok（能响应即代表存活）；分离服务通过 separatorClient 探测，
- * 不可达视为 down。随仪表盘 10s 轮询刷新，故此处不做缓存。
+ * 下载服务通过 downloaderClient 探测，不可达视为 down。随仪表盘 10s 轮询
+ * 刷新，故此处不做缓存。
  */
 router.get('/health', authenticateToken, async (_req: Request, res: Response) => {
   // 后端版本号：复用 /system/info 的读取方式（向上两层找 package.json）
@@ -405,7 +407,36 @@ router.get('/health', authenticateToken, async (_req: Request, res: Response) =>
     };
   }
 
-  res.json({ success: true, data: { backend, separator } });
+  // 下载服务：无复杂安装态，仅探测健康 + 启用源数
+  let downloader: {
+    status: 'ok' | 'down';
+    healthy: boolean;
+    downloadDir?: string;
+    enabledSources?: number;
+    error?: string;
+  } = {
+    status: 'down',
+    healthy: false,
+  };
+
+  try {
+    const health = await downloaderClient.getHealth();
+    downloader = {
+      status: 'ok',
+      healthy: true,
+      downloadDir: health.download_dir,
+      enabledSources: health.enabled_sources?.length,
+    };
+  } catch (error) {
+    downloader = {
+      ...downloader,
+      status: 'down',
+      healthy: false,
+      error: error instanceof Error ? error.message : '下载服务不可达',
+    };
+  }
+
+  res.json({ success: true, data: { backend, separator, downloader } });
 });
 
 export default router;

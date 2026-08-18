@@ -22,6 +22,7 @@ import { aiParseApi } from '../api/ai-parse';
 import { settingsApi } from '../api/settings';
 import { backupApi } from '../api/backup';
 import type { BackupInfo } from '../api/backup';
+import { downloadApi, type PlatformInfo } from '../api/download';
 import { systemApi } from '../api/system';
 import type { SystemInfo } from '../api/system';
 import type { AiParseConfig } from '../types';
@@ -99,6 +100,20 @@ function saveLocalSettings(data: {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch {
     // ignore quota errors
+  }
+}
+
+// 下载默认源勾选：最多同时选中 MAX_DOWNLOAD_SOURCES 个（与下载页一致）
+function toggleDownloadSource(
+  key: string,
+  selected: string[],
+  max: number,
+  setSelected: (v: string[]) => void,
+) {
+  if (selected.includes(key)) {
+    setSelected(selected.filter((k) => k !== key));
+  } else if (selected.length < max) {
+    setSelected([...selected, key]);
   }
 }
 
@@ -230,6 +245,13 @@ export default function Settings() {
   const [md5Dedup, setMd5Dedup] = useState(true);
   const [aiDedup, setAiDedup] = useState(false);
 
+  // 下载配置（音乐源默认选中 + 下载并发）
+  const [downloadPlatforms, setDownloadPlatforms] = useState<PlatformInfo[]>([]);
+  const [downloadDefaultSources, setDownloadDefaultSources] = useState<string[]>(['qq']);
+  const [downloadConcurrency, setDownloadConcurrency] = useState(2);
+  // 下载配置最多同时默认选中的平台数（与下载页一致）
+  const MAX_DOWNLOAD_SOURCES = 3;
+
   // 备份管理
   const [backups, setBackups] = useState<BackupInfo[]>([]);
   const [backupLoading, setBackupLoading] = useState(false);
@@ -325,6 +347,16 @@ export default function Settings() {
       setBackupLoading(false);
     }
 
+    // 加载下载配置（平台列表 + 默认选中源 + 并发数）
+    try {
+      const cfg = await downloadApi.config();
+      setDownloadPlatforms(cfg.platforms);
+      if (cfg.defaultSources.length) setDownloadDefaultSources(cfg.defaultSources);
+      setDownloadConcurrency(cfg.concurrency);
+    } catch {
+      // 下载服务不可用时保留默认，不阻断其它设置加载
+    }
+
   }, [showToast]);
 
   useEffect(() => {
@@ -353,6 +385,8 @@ export default function Settings() {
         { key: 'ai_parse_concurrency', value: String(aiParseConcurrency) },
         { key: 'scan_md5_dedup', value: String(md5Dedup) },
         { key: 'ai_dedup_enabled', value: String(aiDedup) },
+        { key: 'downloader_default_sources', value: downloadDefaultSources.join(',') },
+        { key: 'downloader_concurrency', value: String(downloadConcurrency) },
       ]);
       showToast('success', '设置已保存');
     } catch (err) {
@@ -712,6 +746,86 @@ export default function Settings() {
               )}
             </div>
           )}
+        </SettingCard>
+
+        {/* Download settings */}
+        <SettingCard
+          icon={<Download className="w-5 h-5" />}
+          title="下载配置"
+          description="歌曲下载默认选中的音乐源与下载并发数"
+        >
+          <div className="space-y-sm">
+            <div className="flex flex-col">
+              <span className="block text-sm font-medium text-ink-2 mb-xs">
+                默认选中音乐源
+              </span>
+              {downloadPlatforms.length === 0 ? (
+                <p className="text-xs text-ink-3">
+                  加载平台列表失败（下载服务不可用），请确认下载服务已启动。
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {downloadPlatforms
+                    .filter((p) => p.enabled)
+                    .map((p) => {
+                      const active = downloadDefaultSources.includes(p.key);
+                      const atLimit =
+                        downloadDefaultSources.length >= MAX_DOWNLOAD_SOURCES;
+                      const disabled = !active && atLimit;
+                      return (
+                        <button
+                          key={p.key}
+                          type="button"
+                          disabled={disabled}
+                          onClick={() =>
+                            toggleDownloadSource(
+                              p.key,
+                              downloadDefaultSources,
+                              MAX_DOWNLOAD_SOURCES,
+                              setDownloadDefaultSources,
+                            )
+                          }
+                          aria-pressed={active}
+                          title={
+                            disabled
+                              ? `最多同时默认选中 ${MAX_DOWNLOAD_SOURCES} 个音乐平台`
+                              : undefined
+                          }
+                          className={[
+                            'inline-flex items-center h-8 px-3 rounded-md text-sm border transition-colors',
+                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper',
+                            disabled
+                              ? 'opacity-40 cursor-not-allowed border-border text-ink-2'
+                              : active
+                                ? 'border-accent bg-[color-mix(in_oklch,var(--color-accent)_14%,transparent)] text-accent'
+                                : 'border-border text-ink-2 hover:bg-paper-2',
+                          ].join(' ')}
+                        >
+                          {p.label}
+                        </button>
+                      );
+                    })}
+                </div>
+              )}
+              <span className="text-xs text-ink-2 mt-xs">
+                已默认选中 {downloadDefaultSources.length} / {MAX_DOWNLOAD_SOURCES}
+                （下载页打开时自动勾选这些源，最多同时搜索 {MAX_DOWNLOAD_SOURCES} 个）
+              </span>
+            </div>
+            <Input
+              label="下载并发数"
+              type="number"
+              min="1"
+              max="8"
+              step="1"
+              value={String(downloadConcurrency)}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                setDownloadConcurrency(Number.isFinite(n) && n > 0 ? n : 1);
+              }}
+              hint="同时执行下载任务的最大数量（1-8），保存后立即生效"
+            />
+          </div>
         </SettingCard>
 
         {/* Brand logo settings */}

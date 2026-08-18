@@ -9,7 +9,7 @@
 # because `github.ref_name` is not reliable inside a `workflow_call`.
 #
 # This workflow only BUILDS and ATTACHES artifacts to that release:
-#   1. docker    : build & push backend / separator / web to Aliyun ACR
+#   1. docker    : build & push backend / separator / downloader / web to Aliyun ACR
 #   2. desktop   : build Win(x86/i686) / macOS(x64/arm64)  [no signing]
 #   3. android   : build arm64-v8a / armeabi-v7a APKs  [no signing]
 #

@@ -3,6 +3,13 @@ const url = require('url');
 
 const PORT = 8080;
 const TIMEOUT_MS = 5000;
+// 重操作（搜索 / 人声分离 / 下载）会阻塞数秒到数十秒：代理侧给足超时，否则会提前断开
+// 下游（表现为 "连接失败: UNKNOWN"）。默认 5s 仍用于 admin/h5/websocket 等轻请求。
+const SERVICE_TIMEOUTS = {
+  backend: 90000,
+  separator: 90000,
+  downloader: 90000,
+};
 
 const COLORS = {
   reset: '\x1b[0m',
@@ -77,6 +84,11 @@ const getTarget = (pathname) => {
     return { type: 'proxy', target: `http://localhost:8001${stripped || '/'}`, service: 'separator' };
   }
 
+  if (pathname.startsWith('/downloader/')) {
+    const stripped = pathname.replace(/^\/downloader/, '');
+    return { type: 'proxy', target: `http://localhost:8002${stripped || '/'}`, service: 'downloader' };
+  }
+
   return { type: 'notfound' };
 };
 
@@ -108,6 +120,7 @@ const sendErrorPage = (res, statusCode, title, detail) => {
 const proxyRequest = (req, res, targetUrl, service) => {
   const parsedTarget = url.parse(targetUrl);
   const search = url.parse(req.url).search || '';
+  const timeoutMs = SERVICE_TIMEOUTS[service] || TIMEOUT_MS;
 
   const options = {
     hostname: parsedTarget.hostname,
@@ -128,8 +141,9 @@ const proxyRequest = (req, res, targetUrl, service) => {
     }
   });
 
-  proxyReq.setTimeout(TIMEOUT_MS, () => {
-    proxyReq.destroy(new Error('ETIMEDOUT'));
+  proxyReq.setTimeout(timeoutMs, () => {
+    // 显式带上 code，否则 error handler 会落到 "连接失败: UNKNOWN" 分支，误导排查。
+    proxyReq.destroy(Object.assign(new Error('ETIMEDOUT'), { code: 'ETIMEDOUT' }));
   });
 
   proxyReq.on('error', (err) => {
@@ -138,7 +152,7 @@ const proxyRequest = (req, res, targetUrl, service) => {
       code === 'ECONNREFUSED'
         ? `${service} 未启动 (${parsedTarget.hostname}:${parsedTarget.port})`
         : code === 'ETIMEDOUT'
-          ? `连接 ${service} 超时 (${TIMEOUT_MS / 1000}s)`
+          ? `连接 ${service} 超时 (${timeoutMs / 1000}s)`
           : `${service} 连接失败: ${code}`;
 
     log(req.method, req.url, targetUrl, null, friendly);
@@ -252,7 +266,8 @@ server.listen(PORT, () => {
   console.log(`  ${COLORS.cyan}/api/*${COLORS.reset}          → ${COLORS.yellow}http://localhost:3000${COLORS.reset}   (backend)`);
   console.log(`  ${COLORS.cyan}/ws${COLORS.reset}              → ${COLORS.yellow}ws://localhost:3000/ws${COLORS.reset}  (WebSocket)`);
   console.log(`  ${COLORS.cyan}/ws/*${COLORS.reset}            → ${COLORS.yellow}ws://localhost:3000/ws/*${COLORS.reset} (WebSocket)`);
-  console.log(`  ${COLORS.cyan}/separator/*${COLORS.reset}     → ${COLORS.yellow}http://localhost:8001${COLORS.reset}  (separator)\n`);
+  console.log(`  ${COLORS.cyan}/separator/*${COLORS.reset}     → ${COLORS.yellow}http://localhost:8001${COLORS.reset}  (separator)`);
+  console.log(`  ${COLORS.cyan}/downloader/*${COLORS.reset}    → ${COLORS.yellow}http://localhost:8002${COLORS.reset}  (downloader)\n`);
 
   console.log(`${COLORS.gray}Target services:${COLORS.reset}`);
   const targets = [
@@ -260,6 +275,7 @@ server.listen(PORT, () => {
     ['mobile-h5', 5174],
     ['backend', 3000],
     ['separator', 8001],
+    ['downloader', 8002],
   ];
   for (const [name, port] of targets) {
     const check = http.get(`http://localhost:${port}`, { timeout: 1000 }, (r) => {

@@ -18,6 +18,7 @@ import systemRouter from './system';
 import logsRouter from './logs';
 import backupRouter from './backup';
 import dedupRouter from './dedup';
+import downloadRouter from './download';
 
 const router = Router();
 
@@ -43,5 +44,6 @@ router.use('/', logsRouter);
 router.use('/system', systemRouter);
 router.use('/', backupRouter);
 router.use('/dedup', dedupRouter);
+router.use('/download', downloadRouter);
 
 export default router;

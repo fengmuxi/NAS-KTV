@@ -14,6 +14,7 @@ import Separation from '../pages/Separation';
 import Settings from '../pages/Settings';
 import GpuManage from '../pages/GpuManage';
 import Logs from '../pages/Logs';
+import Download from '../pages/Download';
 
 export const router = createBrowserRouter(
   [
@@ -40,6 +41,7 @@ export const router = createBrowserRouter(
         { path: '/gpu', element: <GpuManage /> },
         { path: '/logs', element: <Logs /> },
         { path: '/settings', element: <Settings /> },
+        { path: '/download', element: <Download /> },
       ],
     },
     { path: '*', element: <Navigate to="/" replace /> },

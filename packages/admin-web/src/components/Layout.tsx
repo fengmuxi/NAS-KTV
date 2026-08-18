@@ -13,6 +13,7 @@ import {
   Cpu,
   ScrollText,
   Settings,
+  Download,
   ChevronLeft,
   ChevronRight,
   Menu,
@@ -29,6 +30,7 @@ import { useAuthStore } from '../stores/auth';
 
 const menuItems = [
   { path: '/', label: '仪表盘', icon: LayoutDashboard },
+  { path: '/download', label: '歌曲下载', icon: Download },
   { path: '/songs', label: '歌曲管理', icon: Music },
   { path: '/scan', label: '扫描任务', icon: Search },
   { path: '/dedup', label: '去重管理', icon: CopyX },

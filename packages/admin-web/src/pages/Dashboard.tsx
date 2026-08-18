@@ -17,6 +17,7 @@ import {
   CalendarRange,
   CopyX,
   Server,
+  Download,
   type LucideIcon,
 } from 'lucide-react';
 import Loading from '../components/Loading';
@@ -664,9 +665,9 @@ export default function Dashboard() {
             })}
           </section>
 
-          {/* 服务健康：后端 API + 人声分离服务（随仪表盘 10s 轮询刷新） */}
+          {/* 服务健康：后端 API + 人声分离服务 + 下载服务（随仪表盘 10s 轮询刷新） */}
           {health && (
-            <section className="grid grid-cols-1 sm:grid-cols-2 gap-md animate-hall-in-delay-1">
+            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-md animate-hall-in-delay-1">
               <ServiceHealthCard
                 title="后端服务"
                 icon={Server}
@@ -695,6 +696,20 @@ export default function Dashboard() {
                     status={sep.status}
                     detail={detail}
                     sub={sub}
+                  />
+                );
+              })()}
+              {(() => {
+                const dl = health.downloader;
+                const detail = dl.status === 'down'
+                  ? dl.error ?? '下载服务不可达'
+                  : `已启用 ${dl.enabledSources ?? 0} 个音源`;
+                return (
+                  <ServiceHealthCard
+                    title="歌曲下载服务"
+                    icon={Download}
+                    status={dl.status}
+                    detail={detail}
                   />
                 );
               })()}

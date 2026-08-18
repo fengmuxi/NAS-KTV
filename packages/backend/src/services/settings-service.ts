@@ -13,6 +13,8 @@ const KEY_AI_PARSE_CONCURRENCY = 'ai_parse_concurrency';
 const KEY_AI_DEDUP_ENABLED = 'ai_dedup_enabled';
 const KEY_SCAN_MD5_DEDUP = 'scan_md5_dedup';
 const KEY_PYTORCH_PROXY = 'pytorch_proxy';
+const KEY_DOWNLOADER_DEFAULT_SOURCES = 'downloader_default_sources';
+const KEY_DOWNLOADER_CONCURRENCY = 'downloader_concurrency';
 
 /**
  * 查询所有设置项
@@ -122,4 +124,29 @@ export async function getScanMd5DedupEnabled(): Promise<boolean> {
 export async function getPytorchProxy(): Promise<string> {
   const row = await getSetting(KEY_PYTORCH_PROXY);
   return row?.value ?? '';
+}
+
+/**
+ * 获取下载页默认选中的音乐源（settings 表 downloader_default_sources，逗号分隔的 short key）。
+ * 返回空数组表示「未配置」，由调用方回落到下载服务的可用源（默认 qq）。
+ */
+export async function getDownloaderDefaultSources(): Promise<string[]> {
+  const row = await getSetting(KEY_DOWNLOADER_DEFAULT_SOURCES);
+  if (!row?.value) return [];
+  return row.value
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/**
+ * 获取下载并发数（settings 表 downloader_concurrency > 环境变量 DOWNLOAD_CONCURRENCY > 默认 2）。
+ * 用于驱动下载服务的下载线程池上限。
+ */
+export async function getDownloaderConcurrency(): Promise<number> {
+  const row = await getSetting(KEY_DOWNLOADER_CONCURRENCY);
+  const val = row?.value ? parseInt(row.value, 10) : NaN;
+  return Number.isFinite(val) && val > 0
+    ? val
+    : parseEnvConcurrency('DOWNLOAD_CONCURRENCY', 2);
 }

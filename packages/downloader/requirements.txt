@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+musicdl
+requests
+mutagen
+pycryptodome

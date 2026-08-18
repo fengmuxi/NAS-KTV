@@ -44,6 +44,7 @@ d:\gitee\nasktv\
 │   ├── mobile-h5/               # 手机点歌 H5 SPA（:5174）
 │   ├── tv-app/                  # Tauri Android TV App（:1420）
 │   ├── separator/               # Python + Demucs 分离服务（:8001）
+│   ├── downloader/              # Python + musicdl 歌曲下载服务（:8002）
 │   └── shared/                  # 共享类型与 Drizzle schema
 ├── deploy/                      # 部署文档
 ├── docs/                        # 开发文档（本文件）
@@ -98,6 +99,8 @@ SCAN_PATH=./data/songs
 SEPARATOR_SERVICE_URL=http://localhost:8001
 SEPARATION_OUTPUT_DIR=./data/separated
 SEPARATION_AUTO_ENABLE=false
+DOWNLOADER_SERVICE_URL=http://localhost:8002
+DOWNLOAD_CONCURRENCY=2
 AI_ENABLED=false
 VITE_API_BASE_URL=http://localhost:3000/api
 VITE_WS_BASE_URL=ws://localhost:3000
@@ -106,7 +109,7 @@ VITE_WS_BASE_URL=ws://localhost:3000
 ### 3.3 创建数据目录
 
 ```bash
-mkdir -p data/{db,songs,separated,uploads,separator-cache}
+mkdir -p data/{db,songs,separated,uploads,separator-cache,downloader-cache}
 ```
 
 ### 3.4 初始化数据库
@@ -129,6 +132,13 @@ pnpm dev
 
 # 或单独启动某个子项目（见下方各子项目章节）
 ```
+
+> ⚠️ **首次启动前必看**：`pnpm dev` 会并行拉起所有服务，其中包含两个 **Python 微服务**——`separator`（人声分离）与 `downloader`（歌曲下载）。它们各自需要一份隔离的 Python 虚拟环境（`.venv`），**必须先用 `uv` 建好，否则 `pnpm dev` 会报 `venv not found` 并跳过该服务**：
+> ```bash
+> pnpm --filter @nasktv/separator run setup
+> pnpm --filter @nasktv/downloader run setup
+> ```
+> `setup` 只需执行一次（自动用 `uv` 创建 `.venv` 并装好各自依赖）；之后直接 `pnpm dev` 即可把它们一起拉起。若用 `docker compose` 部署则无需本地 venv。
 
 ## 三-A、项目启动运行完整流程（端到端）
 
@@ -189,6 +199,10 @@ pnpm --filter @nasktv/backend dev
 # 方式 B：一键启动所有 dev server（backend + admin-web + mobile-h5）
 pnpm dev
 ```
+
+> ⚠️ 首次用方式 B（`pnpm dev`）前，需先为两个 Python 微服务建好 venv（只需一次）：
+> `pnpm --filter @nasktv/separator run setup` 与 `pnpm --filter @nasktv/downloader run setup`。
+> 否则 separator / downloader 会报 `venv not found` 而不启动（不影响 backend / 前端）。详见 §3.5。
 
 验证后端启动成功：
 ```bash
@@ -271,6 +285,19 @@ uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 
 在 Admin Web「人声分离」页对歌曲触发分离任务，完成后即可在 TV App 切换原唱/伴奏/人声辅助模式。
 
+### 步骤 13：（可选）启动歌曲下载服务
+
+如需在后台「歌曲下载」页搜索并下载歌曲（下载后自动扫描入库 + 分离 + AI 解析）：
+```bash
+# 首次需先建 Python 环境（创建 .venv 并安装 musicdl 等依赖）
+pnpm --filter @nasktv/downloader run setup
+
+# 开发模式（热重载）
+pnpm --filter @nasktv/downloader dev
+```
+
+在 Admin Web「歌曲下载」页选择平台、搜索、勾选下载；任务完成后自动触发扫描入库。
+
 ### 完整启动检查清单
 
 | 服务 | 端口 | 启动命令 | 验证方式 |
@@ -280,6 +307,7 @@ uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 | mobile-h5 | 5174 | `pnpm --filter @nasktv/mobile-h5 dev` | 浏览器访问 `http://localhost:5174` |
 | tv-app | 1420 | `pnpm --filter @nasktv/tv-app dev` | 浏览器访问 `http://localhost:1420` |
 | separator | 8001 | `pnpm --filter @nasktv/separator dev` | `curl http://localhost:8001/health` |
+| downloader | 8002 | `pnpm --filter @nasktv/downloader dev` | `curl http://localhost:8002/api/health` |
 
 ### 典型开发场景
 
@@ -373,6 +401,7 @@ pnpm --filter @nasktv/backend drizzle-kit migrate
 | `DB_PATH` | `./data/db/nasktv.db` | SQLite 路径 |
 | `SCAN_PATH` | `./data/songs` | 歌曲库扫描路径 |
 | `SEPARATOR_SERVICE_URL` | `http://localhost:8001` | 分离服务地址 |
+| `DOWNLOADER_SERVICE_URL` | `http://localhost:8002` | 歌曲下载服务地址 |
 | `AI_ENABLED` | `false` | 是否启用 AI 解析 |
 
 **开发说明**：
@@ -824,7 +853,7 @@ curl http://localhost:8001/health
 
 ```bash
 # 方式一：通过 pnpm（无需手动 cd）
-pnpm --filter @nasktv/separator setup
+pnpm --filter @nasktv/separator run setup
 
 # 方式二：手动进入目录执行
 cd packages/separator
@@ -842,7 +871,7 @@ python scripts/setup_venv.py
 
 切换镜像源示例：
 ```bash
-PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple pnpm --filter @nasktv/separator setup
+PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple pnpm --filter @nasktv/separator run setup
 ```
 
 `requirements.txt` 关键依赖：fastapi / uvicorn / numpy / torch / torchaudio / demucs / pydantic / python-multipart / requests / soundfile。
@@ -856,6 +885,35 @@ cd packages/separator
 # 或手动安装：
 .venv\Scripts\python.exe -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
 ```
+
+### 4.7 downloader（歌曲下载微服务 · Python）
+
+**环境需求**：Python 3.11+ / uv / ffmpeg 6+（部分源可能用到 ffmpeg 混流）
+
+**端口**：8002
+
+```bash
+# 进入 downloader 目录
+cd packages/downloader
+
+# 安装依赖（fastapi / uvicorn / musicdl 等，无需 PyTorch）
+pnpm --filter @nasktv/downloader run setup
+
+# 开发模式（热重载）
+pnpm --filter @nasktv/downloader dev      # 开发模式
+pnpm --filter @nasktv/downloader start    # 生产启动
+```
+
+**健康检查**：
+```bash
+curl http://localhost:8002/api/health
+```
+
+**说明**：
+- 下载器通过 [musicdl](https://github.com/CharlesPikachu/musicdl) 从 QQ音乐 / 酷狗 / 酷我 / 网易云 / 汽水 / 5SING / 波点 七个平台搜索并下载歌曲，落盘到 `data/songs/Downloads/<平台>/`，由 backend 扫描自动入库并触发分离与 AI 解析。
+- 下载并发默认 2（`DOWNLOAD_CONCURRENCY`），防止压垮人声分离队列；可用 `ENABLED_SOURCES` 限定启用的平台源。
+- 第三方解析源稳定性随平台政策变动，部分歌曲/平台可能临时不可用，属正常现象。
+- 与 separator 共享同一套 `uv` + 清华 PyPI 镜像的 `setup_venv.py` 一键环境搭建。
 
 #### ffmpeg 安装说明
 
@@ -915,6 +973,7 @@ choco install ffmpeg
 | 变量 | 本地默认 | 生产默认 | 说明 |
 |------|---------|---------|------|
 | `SEPARATOR_SERVICE_URL` | `http://localhost:8001` | `http://separator:8001` | 分离服务地址 |
+| `DOWNLOADER_SERVICE_URL` | `http://localhost:8002` | `http://downloader:8002` | 歌曲下载服务地址 |
 | `SEPARATION_OUTPUT_DIR` | `./data/separated` | `/app/data/separated` | 输出目录 |
 | `SEPARATION_AUTO_ENABLE` | `false` | `false` | 自动触发分离 |
 | `SEPARATION_DEFAULT_MODEL` | `htdemucs_base` | `htdemucs_base` | 分离模型 |

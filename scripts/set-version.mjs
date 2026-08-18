@@ -6,7 +6,7 @@
 //   - 根 package.json
 //   - packages/*/package.json（backend / admin-web / mobile-h5 / tv-app / shared / separator ...）
 //   - packages/tv-app/src-tauri/tauri.conf.json（Tauri 打包版本）
-//   - packages/separator/pyproject.toml（Python 微服务版本）
+//   - packages/separator/pyproject.toml、packages/downloader/pyproject.toml（Python 微服务版本）
 //
 // 调用：
 //   node scripts/set-version.mjs            # 无参数：从 manifest 读取（本地 dev/build 用）
@@ -68,17 +68,18 @@ for (const rel of jsonTargets) {
   changed += 1;
 }
 
-// 2) separator 的 pyproject.toml（PEP 621：version = "x.y.z"）
-const pyproject = resolve(root, 'packages/separator/pyproject.toml');
-if (existsSync(pyproject)) {
+// 2) Python 微服务的 pyproject.toml（PEP 621：version = "x.y.z"）
+for (const pkg of ['separator', 'downloader']) {
+  const pyproject = resolve(root, `packages/${pkg}/pyproject.toml`);
+  if (!existsSync(pyproject)) continue;
   const raw = readFileSync(pyproject, 'utf-8');
   const updated = raw.replace(/^(version\s*=\s*")([^"]*)(")/m, `$1${version}$3`);
   if (updated !== raw) {
     writeFileSync(pyproject, updated, 'utf-8');
-    console.log(`[set-version] packages/separator/pyproject.toml -> ${version}`);
+    console.log(`[set-version] packages/${pkg}/pyproject.toml -> ${version}`);
     changed += 1;
   } else {
-    console.log(`[set-version] packages/separator/pyproject.toml already ${version}`);
+    console.log(`[set-version] packages/${pkg}/pyproject.toml already ${version}`);
   }
 }
 

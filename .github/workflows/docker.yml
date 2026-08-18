@@ -1,4 +1,4 @@
-# Build & push NASKTV Docker images (backend / separator / web)
+# Build & push NASKTV Docker images (backend / separator / downloader / web)
 #
 # Reusable workflow: call from release.yml (with `tag`), or dispatch manually.
 #
@@ -11,6 +11,7 @@
 # Images are pushed to a SINGLE repository, distinguished by tag prefix:
 #   <REGISTRY>/<NAMESPACE>/nasktv:backend-<semver>
 #   <REGISTRY>/<NAMESPACE>/nasktv:separator-<semver>
+#   <REGISTRY>/<NAMESPACE>/nasktv:downloader-<semver>
 #   <REGISTRY>/<NAMESPACE>/nasktv:web-<semver>
 # Each also gets a <service>-<major>.<minor> tag (e.g. backend-0.2),
 # and — only on a real release (inputs.tag provided) — a <service>-latest tag.
@@ -45,6 +46,9 @@ jobs:
           - name: separator
             context: packages/separator
             dockerfile: packages/separator/Dockerfile
+          - name: downloader
+            context: packages/downloader
+            dockerfile: packages/downloader/Dockerfile
           - name: web
             context: .
             dockerfile: packages/web/Dockerfile

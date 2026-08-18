@@ -4,6 +4,7 @@ import * as settingsService from '../services/settings-service';
 import { authenticateToken } from '../middleware/jwt';
 import { separationQueue } from '../services/separation-queue';
 import { aiParseQueue } from '../services/ai-queue';
+import { downloaderClient } from '../services/downloader-client';
 
 const router = Router();
 
@@ -63,6 +64,18 @@ router.put('/', authenticateToken, async (req: Request, res: Response) => {
     }
     if (keys.includes('ai_parse_concurrency')) {
       await aiParseQueue.updateConcurrency();
+    }
+    if (keys.includes('downloader_concurrency')) {
+      const item = settings.find(
+        (s: { key: string; value: string }) => s.key === 'downloader_concurrency',
+      );
+      const n = item ? parseInt(item.value, 10) : NaN;
+      if (Number.isFinite(n) && n > 0) {
+        // 推送下载并发到下载服务（失败仅告警，不影响设置已保存）
+        downloaderClient
+          .configure({ concurrency: n })
+          .catch((e) => logger.warn('推送下载并发到下载服务失败:', e));
+      }
     }
 
     res.json({ success: true, message: 'Settings updated' });

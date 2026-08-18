@@ -61,9 +61,18 @@ export interface SeparatorHealth {
   error?: string;
 }
 
+export interface DownloaderHealth {
+  status: 'ok' | 'down';
+  healthy: boolean;
+  downloadDir?: string;
+  enabledSources?: number;
+  error?: string;
+}
+
 export interface ServicesHealth {
   backend: BackendHealth;
   separator: SeparatorHealth;
+  downloader: DownloaderHealth;
 }
 
 export const systemApi = {

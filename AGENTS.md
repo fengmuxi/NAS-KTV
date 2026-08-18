@@ -68,7 +68,7 @@
 
 ## 项目概览
 
-飞牛 NAS 家庭 KTV 系统（nasktv），三端协同（Admin Web 管理后台 / Android TV App 播放器 / Mobile H5 点歌端）。后端 Node.js + Express + WebSocket + SQLite（better-sqlite3 + Drizzle ORM），Python 微服务提供 Demucs v4 人声分离，AI 辅助解析歌曲元数据。pnpm workspace monorepo，无测试/lint 套件。Docker Compose 三容器部署（backend / separator / web）。
+飞牛 NAS 家庭 KTV 系统（nasktv），三端协同（Admin Web 管理后台 / Android TV App 播放器 / Mobile H5 点歌端）。后端 Node.js + Express + WebSocket + SQLite（better-sqlite3 + Drizzle ORM），Python 微服务提供 Demucs v4 人声分离与 musicdl 歌曲下载，AI 辅助解析歌曲元数据。pnpm workspace monorepo，无测试/lint 套件。Docker Compose 部署（backend / separator / downloader / web）。
 
 ## 目录结构（要点）
 
@@ -88,6 +88,11 @@ pnpm dev                         # 启动所有 dev server + :8080 统一反代�
 pnpm build                       # 构建所有 TS 包（含类型检查）
 docker compose up -d --build     # Docker 部署
 
+# ⚠️ 首次跑 pnpm dev 前，两个 Python 微服务必须先各自建好 venv（否则会报 venv not found）：
+#   pnpm --filter @nasktv/separator run setup
+#   pnpm --filter @nasktv/downloader run setup
+# （setup 只需执行一次；之后直接 pnpm dev 即可把它们一起拉起。也可 docker compose 部署，无需本地 venv）
+
 pnpm --filter @nasktv/backend dev            # 热重载（:3000）
 pnpm --filter @nasktv/backend build          # 类型检查（tsc --noEmit --rootDir ../..）
 pnpm --filter @nasktv/backend db:generate    # 生成迁移
@@ -98,8 +103,10 @@ pnpm --filter @nasktv/admin-web dev|build    # admin-web（mobile-h5 / tv-app �
 pnpm --filter @nasktv/tv-app exec tauri android build --apk   # 打包 Android APK（Tauri 2）
 pnpm --filter @nasktv/tv-app exec tauri android init          # 首次初始化 Android 工程（一次性）
 
-pnpm --filter @nasktv/separator setup        # 一键装 Python 环境（uv + venv）
+pnpm --filter @nasktv/separator run setup    # 一键装 Python 环境（uv + venv）
 pnpm --filter @nasktv/separator dev          # uvicorn --reload（:8001）
+pnpm --filter @nasktv/downloader run setup   # 一键装 Python 环境（uv + venv，musicdl 等）
+pnpm --filter @nasktv/downloader dev         # uvicorn --reload（:8002，歌曲下载微服务）
 ```
 
 ## 路径与环境（重要）
