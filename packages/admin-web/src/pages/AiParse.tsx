@@ -6,6 +6,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Bot,
+  Music,
+  Sparkles,
   Save,
   RefreshCw,
   Check,
@@ -32,6 +34,7 @@ import type { AiParseTask, AiConfig, PromptTemplate, AiParseStats } from '../api
 import { songsApi } from '../api/songs';
 import type { Song } from '../types';
 import Button from '../components/Button';
+import EmptyState from '../components/EmptyState';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
 import ConfirmModal from '../components/ConfirmModal';
@@ -936,7 +939,11 @@ export default function AiParse() {
         {tasksLoading ? (
           <Loading />
         ) : tasks.length === 0 ? (
-          <div className="py-xl text-center text-ink-3 text-sm">暂无解析任务</div>
+          <EmptyState
+            icon={<Sparkles className="w-8 h-8" />}
+            title="暂无解析任务"
+            description="开启自动解析或手动提交后，任务会显示在这里"
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -1502,7 +1509,7 @@ export default function AiParse() {
           {songPickerLoading ? (
             <Loading />
           ) : songPickerSongs.length === 0 ? (
-            <div className="py-lg text-center text-ink-3 text-sm">暂无歌曲</div>
+            <EmptyState icon={<Music className="w-8 h-8" />} title="暂无歌曲" />
           ) : (
             <div className="max-h-80 overflow-y-auto border border-border rounded-md">
               <table className="w-full text-sm">

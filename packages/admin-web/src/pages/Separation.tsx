@@ -23,6 +23,7 @@ import { separationApi } from '../api/separation';
 import { songsApi } from '../api/songs';
 import type { SeparationTask, Song } from '../types';
 import Button from '../components/Button';
+import EmptyState from '../components/EmptyState';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
 import Loading from '../components/Loading';
@@ -586,9 +587,11 @@ export default function Separation() {
         {loading ? (
           <Loading />
         ) : tasks.length === 0 ? (
-          <div className="py-xl text-center text-ink-3 text-sm">
-            暂无分离任务
-          </div>
+          <EmptyState
+            icon={<Music className="w-8 h-8" />}
+            title="暂无分离任务"
+            description="提交歌曲分离请求后，任务会显示在这里"
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

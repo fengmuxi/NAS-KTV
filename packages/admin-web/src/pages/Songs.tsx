@@ -5,8 +5,9 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Pencil, Trash2, Bot, Mic, Search, RotateCcw, Headphones, Film, X, FileText, Upload, RefreshCw } from 'lucide-react';
+import { Pencil, Trash2, Bot, Mic, Music, Search, RotateCcw, Headphones, Film, X, FileText, Upload, RefreshCw } from 'lucide-react';
 import Button from '../components/Button';
+import EmptyState from '../components/EmptyState';
 import ConfirmModal from '../components/ConfirmModal';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
@@ -742,8 +743,16 @@ export default function Songs() {
                 </tr>
               ) : songs.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="p-xl text-center text-ink-3 text-sm">
-                    {hasActiveFilter ? '没有匹配的歌曲，试试调整筛选条件' : '暂无歌曲数据'}
+                  <td colSpan={9}>
+                    <EmptyState
+                      icon={<Music className="w-8 h-8" />}
+                      title={hasActiveFilter ? '没有匹配的歌曲' : '暂无歌曲数据'}
+                      description={
+                        hasActiveFilter
+                          ? '试试调整筛选条件或清空关键词'
+                          : '点击右上角「新增歌曲」导入本地音乐'
+                      }
+                    />
                   </td>
                 </tr>
               ) : (

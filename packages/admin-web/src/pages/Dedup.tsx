@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { RotateCcw, Clock, CopyX, Eye } from 'lucide-react';
 import Button from '../components/Button';
+import EmptyState from '../components/EmptyState';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
 import {
@@ -316,9 +317,11 @@ export default function Dedup() {
           </div>
 
           {dedupTasks.length === 0 && (
-            <div className="px-md py-lg text-sm text-ink-3 text-center">
-              暂无去重任务，开启开关并执行去重后此处显示记录
-            </div>
+            <EmptyState
+              icon={<CopyX className="w-8 h-8" />}
+              title="暂无去重任务"
+              description="开启开关并执行去重后，记录会显示在这里"
+            />
           )}
 
           <div className="divide-y divide-border">

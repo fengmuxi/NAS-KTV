@@ -15,6 +15,7 @@ import {
 import { devicesApi } from '../api/devices';
 import type { Device } from '../types';
 import Button from '../components/Button';
+import EmptyState from '../components/EmptyState';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
 import Input from '../components/Input';
@@ -664,9 +665,11 @@ export default function Devices() {
         {loading ? (
           <Loading />
         ) : devices.length === 0 ? (
-          <div className="py-xl text-center text-ink-3 text-sm">
-            暂无设备记录
-          </div>
+          <EmptyState
+            icon={<Smartphone className="w-8 h-8" />}
+            title="暂无设备记录"
+            description="已授权的电视 / 手机将显示在这里"
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

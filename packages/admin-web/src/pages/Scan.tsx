@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   FolderSearch,
+  Inbox,
   FolderOpen,
   Play,
   Loader2,
@@ -23,6 +24,7 @@ import Button from '../components/Button';
 import Badge from '../components/Badge';
 import Loading from '../components/Loading';
 import Pagination from '../components/Pagination';
+import EmptyState from '../components/EmptyState';
 import FolderPicker from '../components/FolderPicker';
 import Modal from '../components/Modal';
 import { scanApi, type ScanResultsResponse, type ScanResultItem } from '../api/scan';
@@ -678,7 +680,11 @@ export default function Scan() {
             {historyError}
           </div>
         ) : historyItems.length === 0 ? (
-          <div className="p-lg text-sm text-ink-3">暂无扫描记录</div>
+          <EmptyState
+            icon={<FolderSearch className="w-8 h-8" />}
+            title="暂无扫描记录"
+            description="运行一次媒体库扫描后，记录会显示在这里"
+          />
         ) : (
           <div className="divide-y divide-border">
             {historyItems.map((task) => {
@@ -881,7 +887,7 @@ export default function Scan() {
               {resultsLoading ? (
                 <div className="text-sm text-ink-3 py-sm">加载中...</div>
               ) : !results || results.items.length === 0 ? (
-                <div className="text-sm text-ink-3 py-sm">暂无记录</div>
+                <EmptyState icon={<Inbox className="w-8 h-8" />} title="暂无记录" />
               ) : (
                 <ul className="divide-y divide-border max-h-60 overflow-y-auto pr-sm">
                   {results.items.map((item) => (

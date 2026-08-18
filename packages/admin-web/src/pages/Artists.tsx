@@ -4,6 +4,7 @@ import { Plus, Pencil, Trash2, Search, User, Users, ListMusic } from 'lucide-rea
 import { artistsApi } from '../api/artists';
 import type { Artist } from '../types';
 import Button from '../components/Button';
+import EmptyState from '../components/EmptyState';
 import Input from '../components/Input';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
@@ -294,13 +295,17 @@ export default function Artists() {
       {loading ? (
         <Loading />
       ) : displayed.length === 0 ? (
-        <div className="text-center py-xl text-ink-3">
-          {selectedLetter
-            ? `当前页没有以 ${selectedLetter} 开头的歌手`
-            : search
-            ? '没有匹配的歌手'
-            : '暂无歌手，点击右上角新增'}
-        </div>
+        <EmptyState
+          icon={<Users className="w-8 h-8" />}
+          title={
+            selectedLetter
+              ? `当前页没有以 ${selectedLetter} 开头的歌手`
+              : search
+              ? '没有匹配的歌手'
+              : '暂无歌手'
+          }
+          description={selectedLetter || search ? undefined : '点击右上角「新增歌手」创建'}
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-md">
           {displayed.map((a) => {
