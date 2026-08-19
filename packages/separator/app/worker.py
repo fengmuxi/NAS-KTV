@@ -269,9 +269,22 @@ class SeparateWorker:
             instrumental_mp3_path = os.path.join(task.output_dir, f"{base_name}_instrumental.mp3")
 
             transcode_to_mp3(result['vocals_path'], vocals_mp3_path)
+            # 转码成功即删除 separated/ 中的 wav 中间产物，避免 wav+mp3 重复存放占用大量磁盘
+            if os.path.exists(result['vocals_path']):
+                os.remove(result['vocals_path'])
 
             progress_callback(90, "transcoding_instrumental")
             transcode_to_mp3(result['instrumental_path'], instrumental_mp3_path)
+            if os.path.exists(result['instrumental_path']):
+                os.remove(result['instrumental_path'])
+
+            # separated/ 已无 wav，移除空目录（若存在）
+            sep_dir = os.path.join(task.output_dir, "separated")
+            try:
+                if os.path.isdir(sep_dir) and not os.listdir(sep_dir):
+                    os.rmdir(sep_dir)
+            except OSError:
+                pass
 
             # 清理临时文件
             if temp_audio_path and os.path.exists(temp_audio_path):

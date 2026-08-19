@@ -496,10 +496,10 @@ class SeparationQueue extends EventEmitter {
   }
 
   /**
-   * 任务完成：备份旧产物 → 替换为新产物 → 写回歌曲表
+   * 任务完成：移除旧产物 → 替换为新产物 → 写回歌曲表
    *
-   * 重新分离场景下旧产物在任务成功前始终保持不动：
-   * 1. 先把旧文件移入 song_<id>/backup/（仅保留最近一份）
+   * 后台无恢复备份的功能，保留旧结果无意义，故重新分离成功时直接删除旧产物：
+   * 1. 删除 song_<id>/ 下的旧 vocals/instrumental 成品
    * 2. 再把临时目录中的新产物移动到正式位置
    * 3. 清理临时目录（含 demucs 中间产物）
    */
@@ -512,24 +512,18 @@ class SeparationQueue extends EventEmitter {
     const outputDir = path.join(DEFAULT_OUTPUT_DIR, `song_${songId}`);
     const tmpDir = path.join(DEFAULT_OUTPUT_DIR, `.tmp_${taskId}`);
 
-    // 1. 备份旧产物（只保留最近一份备份）
+    // 1. 移除旧产物（后台无恢复功能，备份无意义；新结果就绪后直接删旧）
     const song = db
       .select()
       .from(schema.songs)
       .where(eq(schema.songs.id, songId))
       .get();
     if (song && (song.vocalsPath || song.instrumentalPath)) {
-      const backupDir = path.join(outputDir, 'backup');
-      fs.rmSync(backupDir, { recursive: true, force: true });
-      fs.mkdirSync(backupDir, { recursive: true });
       for (const p of [song.vocalsPath, song.instrumentalPath]) {
         if (!p) continue;
         const resolved = resolveStoredPath(p);
         if (fs.existsSync(resolved)) {
-          fs.renameSync(
-            resolved,
-            path.join(backupDir, path.basename(resolved)),
-          );
+          fs.rmSync(resolved, { recursive: true, force: true });
         }
       }
     }
