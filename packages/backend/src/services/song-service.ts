@@ -1,5 +1,9 @@
 import { eq, like, and, sql, desc, inArray } from 'drizzle-orm';
+import { rm } from 'fs/promises';
+import path from 'path';
 import { db, schema } from '../db';
+import { config } from '../config';
+import logger from '../logger';
 import { deleteArtistIfOrphan } from './song-info-parser';
 
 const { songs, artists, songCategories, categoryItems, songArtists } = schema;
@@ -143,7 +147,7 @@ export async function getSongs(params: GetSongsParams) {
     .from(songs)
     .leftJoin(artists, eq(songs.artistId, artists.id))
     .where(whereClause)
-    .orderBy(desc(songs.createdAt))
+    .orderBy(desc(songs.createdAt), desc(songs.id))
     .limit(pageSize)
     .offset(offset);
 
@@ -379,5 +383,22 @@ export async function deleteSong(id: number) {
   await db.delete(schema.roomQueues).where(eq(schema.roomQueues.songId, id));
   await db.delete(schema.playlistSongs).where(eq(schema.playlistSongs.songId, id));
   const result = await db.delete(songs).where(eq(songs.id, id)).returning();
+  if (result[0]) {
+    await cleanupSeparationOutput(id);
+  }
   return result[0] || null;
+}
+
+/**
+ * 删除歌曲时清理其分离产物目录 data/separation/song_<id>
+ * （仅清理分离 mp3 成品，保留歌词与源音频文件）
+ */
+async function cleanupSeparationOutput(songId: number) {
+  const dir = path.join(config.separationOutputDir, `song_${songId}`);
+  try {
+    await rm(dir, { recursive: true, force: true });
+    logger.info(`Deleted separation output for song ${songId}: ${dir}`);
+  } catch (err) {
+    logger.warn(`Failed to delete separation output for song ${songId}: ${dir}`, err);
+  }
 }
