@@ -20,7 +20,6 @@ const css = `
 .visualizer-canvas {
   width: 100%;
   height: 100%;
-}
 `;
 
 // 颜色插值
@@ -67,6 +66,8 @@ export default function Visualizer({ isActive = true, analyser }: VisualizerProp
   const rafRef = useRef<number>(0);
   const frameRef = useRef(0);
   const prevDataRef = useRef<number[]>([]);
+  const rotationRef = useRef(0);        // 整体旋转（0~1 顺转），用于频谱柱随时间慢转
+  const lastFrameTimeRef = useRef(0);   // 上一帧时间戳（计算 dt）
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -77,14 +78,11 @@ export default function Visualizer({ isActive = true, analyser }: VisualizerProp
 
     const accentRgb = getAccentRgb();
     const accent2Rgb = getAccent2Rgb();
-    const accentCss = `rgb(${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]})`;
 
-    // 获取实际显示尺寸
+    // 同步 canvas 分辨率与显示尺寸
     const rect = canvas.getBoundingClientRect();
     const width = rect.width;
     const height = rect.height;
-
-    // 设置 canvas 内部分辨率与显示尺寸一致
     if (canvas.width !== width || canvas.height !== height) {
       canvas.width = width;
       canvas.height = height;
@@ -92,171 +90,144 @@ export default function Visualizer({ isActive = true, analyser }: VisualizerProp
 
     const centerX = width / 2;
     const centerY = height / 2;
-
-    // 圆环参数 - 根据屏幕尺寸自适应
     const minDim = Math.min(width, height);
-    const ringRadius = minDim * 0.12;     // 基准圆环半径（柱子起点）
-    const maxBarHeight = minDim * 0.15;   // 最大柱子高度
-    const numBars = 180;
-    const barWidth = (2 * Math.PI * ringRadius) / numBars * 0.8; // 柱子宽度
-    const dotSize = Math.max(2, minDim * 0.003);
 
-    // 清除画布
+    // 自适应参数（更稀疏、更克制）
+    const ringRadius = minDim * 0.18;
+    const maxBarHeight = minDim * 0.22;
+    const numBars = 60;            // 圆周上均匀分布的频谱柱数（满圈闭合）
+    const barWidth = Math.max(2, minDim * 0.005);
+    const tipDotR = Math.max(1.5, minDim * 0.003);
+    const rotation = rotationRef.current;
+
     ctx.clearRect(0, 0, width, height);
 
+    // 获取频率数据
     let dataArray: number[] = [];
-
     if (analyser && dataArrayRef.current) {
       analyser.getByteFrequencyData(dataArrayRef.current);
       dataArray = Array.from(dataArrayRef.current);
     } else {
-      // 无 analyser 时使用模拟数据
       frameRef.current++;
       const frame = frameRef.current;
-      dataArray = Array.from({ length: 128 }, (_, i) => {
-        const wave1 = Math.sin((frame + i * 8) / 12) * 80;
-        const wave2 = Math.sin((frame + i * 12) / 10) * 60;
-        const wave3 = Math.sin((frame + i * 5) / 18) * 40;
-        return Math.floor(Math.max(0, Math.min(255, 100 + wave1 + wave2 + wave3)));
+      dataArray = Array.from({ length: 64 }, (_, i) => {
+        const wave = Math.sin((frame + i * 6) / 14) * 0.5 + 0.5;
+        return Math.floor(40 + wave * 215);
       });
     }
 
-    // 平滑数据
-    if (prevDataRef.current.length === 0) {
+    // 平滑 prevData
+    if (prevDataRef.current.length !== numBars) {
       prevDataRef.current = new Array(numBars).fill(0);
     }
 
-    // 先绘制基准圆环（在所有柱子下面）
+    // 基准圆环（细，淡）
     ctx.beginPath();
     ctx.arc(centerX, centerY, ringRadius, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]}, 0.35)`;
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = `rgba(${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]}, 0.15)`;
+    ctx.lineWidth = 1;
     ctx.stroke();
 
-    // 圆环上的小点（柱子的起点标记）
+    // 频谱柱：实线光带（带渐变透明度），随整体旋转，均匀分布成完整圆周
+    // 采样时跳过首尾低频/高频段（这两段频响变化小、柱子几乎不动），视觉更聚焦中频
+    const skipFreqFrac = 0.12;
+    const freqStart = Math.floor(dataArray.length * skipFreqFrac);
+    const freqSpan = Math.max(1, Math.floor(dataArray.length * (1 - 2 * skipFreqFrac)));
+    const rotationOffset = rotation * Math.PI * 2;
+    ctx.lineCap = 'round';
     for (let i = 0; i < numBars; i++) {
-      const angle = (i / numBars) * Math.PI * 2 - Math.PI / 2;
-      const baseX = centerX + Math.cos(angle) * ringRadius;
-      const baseY = centerY + Math.sin(angle) * ringRadius;
-
-      ctx.beginPath();
-      ctx.arc(baseX, baseY, dotSize * 1.2, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]}, 0.5)`;
-      ctx.fill();
-    }
-
-    // 绘制从圆环向外延伸的柱子
-    for (let i = 0; i < numBars; i++) {
-      const angle = (i / numBars) * Math.PI * 2 - Math.PI / 2;
+      const angle = rotationOffset + (i / numBars) * Math.PI * 2 - Math.PI / 2;
       const cos = Math.cos(angle);
       const sin = Math.sin(angle);
 
-      // 柱子起点（在圆环上）
-      const baseX = centerX + cos * ringRadius;
-      const baseY = centerY + sin * ringRadius;
-
-      // 从频率数据中采样
-      const dataIndex = Math.floor((i / numBars) * dataArray.length);
+      const dataIndex = Math.floor(freqStart + (i / numBars) * freqSpan);
       const value = dataArray[dataIndex] / 255;
-
-      // 平滑过渡
       const smoothValue = prevDataRef.current[i] * 0.55 + value * 0.45;
       prevDataRef.current[i] = smoothValue;
 
-      // 柱子高度（从圆环表面向外）
-      const barHeight = Math.max(0, smoothValue * maxBarHeight);
+      const barLen = Math.max(2, smoothValue * maxBarHeight);
 
-      // 柱子终点
-      const tipX = baseX + cos * barHeight;
-      const tipY = baseY + sin * barHeight;
+      const baseX = centerX + cos * ringRadius;
+      const baseY = centerY + sin * ringRadius;
+      const tipX = centerX + cos * (ringRadius + barLen);
+      const tipY = centerY + sin * (ringRadius + barLen);
 
-      // 颜色渐变：accent（蓝）→ accent-2（紫蓝），统一品牌色
-      const colorT = i / numBars;
-      const color = lerpColor(accentRgb, accent2Rgb, colorT);
-      const r = color[0];
-      const g = color[1];
-      const b = color[2];
+      // 颜色：accent → accent-2 按角度渐变
+      const t = i / numBars;
+      const c = lerpColor(accentRgb, accent2Rgb, t);
+      const r = Math.floor(c[0]);
+      const g = Math.floor(c[1]);
+      const b = Math.floor(c[2]);
 
-      // 绘制柱子（间断线段：一段段带间隔的短线，从圆环向外延伸）
-      const segmentLen = Math.max(2, minDim * 0.004);      // 每段长度
-      const segmentGap = segmentLen * 1.6;                 // 段间空隙
-      const numSegments = Math.floor(barHeight / (segmentLen + segmentGap));
+      // 线段渐变：从基部较亮到末端淡出
+      const grad = ctx.createLinearGradient(baseX, baseY, tipX, tipY);
+      grad.addColorStop(0, `rgba(${r},${g},${b},0.75)`);
+      grad.addColorStop(1, `rgba(${r},${g},${b},0.05)`);
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = barWidth;
+      ctx.beginPath();
+      ctx.moveTo(baseX, baseY);
+      ctx.lineTo(tipX, tipY);
+      ctx.stroke();
 
-      for (let s = 0; s < numSegments; s++) {
-        const segStart = ringRadius + s * (segmentLen + segmentGap);
-        const segEnd = segStart + segmentLen;
-
-        const startX = centerX + cos * segStart;
-        const startY = centerY + sin * segStart;
-        const endX = centerX + cos * segEnd;
-        const endY = centerY + sin * segEnd;
-
-        // 越靠外透明度越高
-        const alpha = 0.35 + (s / numSegments) * 0.65;
-
+      // 末端亮点（仅在柱子足够长时）
+      if (barLen > 6) {
         ctx.beginPath();
-        ctx.moveTo(startX, startY);
-        ctx.lineTo(endX, endY);
-        ctx.strokeStyle = `rgba(${Math.floor(r)}, ${Math.floor(g)}, ${Math.floor(b)}, ${alpha})`;
-        ctx.lineWidth = barWidth;
-        ctx.lineCap = 'round';
-        ctx.stroke();
-      }
-
-      // 柱子顶端亮点
-      if (barHeight > 2) {
-        ctx.beginPath();
-        ctx.arc(centerX + cos * (ringRadius + barHeight), centerY + sin * (ringRadius + barHeight), dotSize, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${Math.floor(r)}, ${Math.floor(g)}, ${Math.floor(b)}, 0.9)`;
+        ctx.arc(tipX, tipY, tipDotR, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${r},${g},${b},0.85)`;
         ctx.fill();
       }
     }
 
-    // 绘制中心发光
-    const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, ringRadius * 0.6);
-    gradient.addColorStop(0, `rgba(${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]}, 0.18)`);
-    gradient.addColorStop(0.6, `rgba(${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]}, 0.06)`);
-    gradient.addColorStop(1, 'transparent');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
+    // 中心发光核（径向渐变填充圆）
+    const coreR = ringRadius * 0.45;
+    const coreGrad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, coreR);
+    coreGrad.addColorStop(0, `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},0.4)`);
+    coreGrad.addColorStop(0.55, `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},0.12)`);
+    coreGrad.addColorStop(1, `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},0)`);
+    ctx.fillStyle = coreGrad;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, coreR, 0, Math.PI * 2);
+    ctx.fill();
 
-    // 绘制中心流动交叉曲线动画（圆环内部）
-    const flowR = ringRadius * 0.95;
+    // 中心流动曲线：更少（3 条）+ 更淡
+    const flowR = ringRadius * 0.7;
     const now = performance.now() / 1000;
-    const numCurves = 6;
-
+    const numCurves = 3;
     for (let c = 0; c < numCurves; c++) {
       const phase = (c / numCurves) * Math.PI * 2;
-      const dir = c % 2 === 0 ? 1 : -1; // 一半顺转一半逆转，形成交叉
-      const rotate = now * 0.25 * dir + phase * 0.5;
-
+      const dir = c % 2 === 0 ? 1 : -1;
+      const rotate = now * 0.2 * dir + phase;
       ctx.beginPath();
-      const pts = 120;
+      const pts = 100;
       for (let p = 0; p <= pts; p++) {
         const theta = (p / pts) * Math.PI * 2;
-        const wave = 0.55 + 0.45 * Math.sin(3 * theta + now * 1.8 + phase);
+        const wave = 0.6 + 0.4 * Math.sin(3 * theta + now * 1.5 + phase);
         const r = flowR * wave;
         const x = centerX + Math.cos(theta + rotate) * r;
         const y = centerY + Math.sin(theta + rotate) * r;
-        if (p === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
+        if (p === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
       }
       ctx.closePath();
-      ctx.strokeStyle = accentCss;
-      ctx.globalAlpha = Math.max(0.12, 0.5 - c * 0.05);
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},0.28)`;
+      ctx.lineWidth = 1.2;
       ctx.stroke();
-      ctx.globalAlpha = 1;
     }
 
-    // 中心小点
+    // 中心小圆点
     ctx.beginPath();
-    ctx.arc(centerX, centerY, 5, 0, Math.PI * 2);
-    ctx.fillStyle = accentCss;
+    ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},0.9)`;
     ctx.fill();
+
+    // 整体慢速顺转（约每 20s 转一圈）
+    const nowMs = performance.now();
+    if (lastFrameTimeRef.current) {
+      const dt = (nowMs - lastFrameTimeRef.current) / 1000;
+      rotationRef.current = (rotationRef.current + dt * 0.05) % 1;
+    }
+    lastFrameTimeRef.current = nowMs;
 
     rafRef.current = requestAnimationFrame(draw);
   }, [analyser]);

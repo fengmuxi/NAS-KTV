@@ -632,8 +632,8 @@ export function usePlayer({
   }, [currentTime, lyrics, currentLyricIndex, isPlaying, songId, lyricOffsetMs]);
 
   // 应用歌词偏移（TV 端为房间内唯一权威值）。
-  // broadcast=true 时把结果回广播给房间，使所有手机 UI 显示同一个值；
-  // 收到服务端/H5 下发的绝对值时不再回广播，避免消息回环。
+  // broadcast=true 时把结果回广播给房间，使所有手机 UI 显示同一个值。
+  // （后端 broadcastToRoom 会排除发送者，广播不会回到 TV 自身，不会形成回环）
   const applyLyricOffset = useCallback(
     (offsetMs: number, broadcast: boolean) => {
       const clamped = Math.max(-10000, Math.min(10000, Math.round(offsetMs)));
@@ -664,7 +664,7 @@ export function usePlayer({
       const payload = (msg.payload ?? {}) as LyricOffsetPayload;
       const offset = Number(payload.offsetMs);
       if (Number.isFinite(offset)) {
-        applyLyricOffset(offset, false);
+        applyLyricOffset(offset, true);
       }
     });
     return unsub;
