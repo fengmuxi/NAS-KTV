@@ -304,9 +304,14 @@ export async function processMediaFile(filePath: string, options?: { skipDedup?:
       if (!song.lyricsPath && fileType === 'audio') {
         try {
           const tags = await parseAudioTags(filePath);
-          if (tags?.lyrics) {
-            await fs.mkdir(config.lyricsDir, { recursive: true });
-            const embeddedPath = path.join(config.lyricsDir, `${song.id}.lrc`);
+          if (typeof tags?.lyrics === 'string' && tags.lyrics.trim()) {
+            const embeddedPath = path
+              .join(
+                path.dirname(filePath),
+                path.basename(filePath, path.extname(filePath)) + '.lrc',
+              )
+              .replace(/\\/g, '/');
+            await fs.mkdir(path.dirname(embeddedPath), { recursive: true });
             await fs.writeFile(embeddedPath, tags.lyrics, 'utf-8');
             await db
               .update(schema.songs)
@@ -392,12 +397,17 @@ export async function processMediaFile(filePath: string, options?: { skipDedup?:
       })
       .returning();
 
-    // 内嵌歌词落地：无外部 .lrc 时，把 ID3/m4a 内嵌歌词写入 data/lyrics/<id>.lrc
-    // 并回写 lyricsPath；前端 GET /lyrics 无感知（统一管理目录，与 Admin 手动保存一致）
-    if (!lyricsPath && tags?.lyrics) {
+    // 内嵌歌词落地：无外部同名 .lrc 时，把 ID3/m4a 内嵌歌词写入与音频同目录同名的 .lrc
+    // 并回写 lyricsPath；扫描优先识别外部同名 .lrc，仅在无外部时才落盘内嵌/后台歌词
+    if (!lyricsPath && typeof tags?.lyrics === 'string' && tags.lyrics.trim()) {
       try {
-        await fs.mkdir(config.lyricsDir, { recursive: true });
-        const embeddedLyricsPath = path.join(config.lyricsDir, `${newSong.id}.lrc`);
+        const embeddedLyricsPath = path
+          .join(
+            path.dirname(filePath),
+            path.basename(filePath, path.extname(filePath)) + '.lrc',
+          )
+          .replace(/\\/g, '/');
+        await fs.mkdir(path.dirname(embeddedLyricsPath), { recursive: true });
         await fs.writeFile(embeddedLyricsPath, tags.lyrics, 'utf-8');
         await db
           .update(schema.songs)

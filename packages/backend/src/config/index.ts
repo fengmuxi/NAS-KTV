@@ -30,7 +30,6 @@ export const config = {
   ),
   scanPath: resolvePath(process.env.SCAN_PATH || './data/songs'),
   uploadPath: resolvePath(process.env.UPLOAD_PATH || './data/uploads'),
-  lyricsDir: resolvePath(process.env.LYRICS_DIR || './data/lyrics'),
   // 后端内置静态资源（默认 logo 等）
   assetsDir: resolvePath('./packages/backend/assets'),
   // 自定义 logo 保存路径（上传后写入此处，settings.logo_path 指向）

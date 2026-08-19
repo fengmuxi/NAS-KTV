@@ -756,8 +756,16 @@ router.put(
         throw createAppError('Song not found', 404);
       }
 
-      fs.mkdirSync(config.lyricsDir, { recursive: true });
-      const lyricsFile = path.join(config.lyricsDir, `${songId}.lrc`);
+      if (!song.filePath) {
+        throw createAppError('Song has no file path', 400);
+      }
+      const lyricsFile = path
+        .join(
+          path.dirname(song.filePath),
+          path.basename(song.filePath, path.extname(song.filePath)) + '.lrc',
+        )
+        .replace(/\\/g, '/');
+      fs.mkdirSync(path.dirname(lyricsFile), { recursive: true });
       fs.writeFileSync(lyricsFile, content, 'utf-8');
 
       db.update(schema.songs)
@@ -797,11 +805,10 @@ router.delete(
         throw createAppError('Song not found', 404);
       }
 
+      // 同名同目录布局：歌词文件与音乐文件同目录。扫描优先识别外部同名 .lrc，
+      // 仅在无外部 lrc 时才落盘内嵌/后台歌词，二者不会并存，删除即删 lyricsPath 指向的文件。
       if (song.lyricsPath && fs.existsSync(song.lyricsPath)) {
-        // 仅删除本站歌词目录下的文件，避免误删扫描发现的同名 .lrc
-        if (path.resolve(song.lyricsPath).startsWith(config.lyricsDir)) {
-          fs.unlinkSync(song.lyricsPath);
-        }
+        fs.unlinkSync(song.lyricsPath);
       }
 
       db.update(schema.songs)
