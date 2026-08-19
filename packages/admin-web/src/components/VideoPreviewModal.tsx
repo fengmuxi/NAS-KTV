@@ -3,7 +3,7 @@
  * contrast: pass (AA on paper/ink pairings)
  */
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import Modal from './Modal';
 import AudioPlayer from './AudioPlayer';
 import { Film, Music, Mic } from 'lucide-react';
@@ -24,19 +24,25 @@ export default function VideoPreviewModal({
   separationStatus,
 }: VideoPreviewModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  // 视频容器宽高比，跟随视频自身比例，避免横/竖屏视频出现难看黑条
+  const [aspect, setAspect] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (!isOpen && videoRef.current) {
       videoRef.current.pause();
       videoRef.current.currentTime = 0;
     }
+    // 重新打开时重置，等待新视频 metadata
+    if (isOpen) setAspect(undefined);
   }, [isOpen]);
 
   if (!isOpen) return null;
 
+  const showSeparated = separationStatus === 'completed';
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="MV 预览">
-      <div className="space-y-sm">
+    <Modal isOpen={isOpen} onClose={onClose} title="MV 预览" size="lg">
+      <div className="space-y-md">
         <div className="flex items-center gap-xs">
           <Film className="w-4 h-4 text-accent" />
           <p className="text-sm text-ink-2 truncate" title={songTitle}>
@@ -44,7 +50,13 @@ export default function VideoPreviewModal({
           </p>
         </div>
 
-        <div className="relative w-full h-[70vh] bg-black rounded-lg overflow-hidden">
+        <div
+          className="relative w-full bg-black rounded-lg overflow-hidden mx-auto"
+          style={{
+            aspectRatio: aspect ?? '16/9',
+            maxHeight: 'min(60vh, 560px)',
+          }}
+        >
           <video
             ref={videoRef}
             src={`/api/songs/${songId}/audio`}
@@ -52,18 +64,25 @@ export default function VideoPreviewModal({
             autoPlay
             className="w-full h-full object-contain"
             preload="metadata"
+            onLoadedMetadata={(e) => {
+              const v = e.currentTarget;
+              if (v.videoWidth && v.videoHeight) {
+                setAspect(`${v.videoWidth}/${v.videoHeight}`);
+              }
+            }}
           >
             您的浏览器不支持视频播放
           </video>
         </div>
 
-        {separationStatus === 'completed' && (
-          <>
-            <div className="border-t border-border" />
+        {showSeparated && (
+          <div className="grid grid-cols-2 gap-sm pt-xs border-t border-border">
             <div className="space-y-xs">
-              <div className="flex items-center gap-xs mb-xs">
+              <div className="flex items-center gap-xs">
                 <Music className="w-3.5 h-3.5 text-accent" />
-                <span className="text-xs font-medium text-ink-3 uppercase tracking-wide">伴奏</span>
+                <span className="text-xs font-medium text-ink-3 uppercase tracking-wide">
+                  伴奏
+                </span>
               </div>
               <AudioPlayer
                 src={`/api/songs/${songId}/instrumental`}
@@ -71,12 +90,12 @@ export default function VideoPreviewModal({
                 accentColor="instrumental"
               />
             </div>
-
-            <div className="border-t border-border" />
             <div className="space-y-xs">
-              <div className="flex items-center gap-xs mb-xs">
+              <div className="flex items-center gap-xs">
                 <Mic className="w-3.5 h-3.5 text-warning" />
-                <span className="text-xs font-medium text-ink-3 uppercase tracking-wide">人声</span>
+                <span className="text-xs font-medium text-ink-3 uppercase tracking-wide">
+                  人声
+                </span>
               </div>
               <AudioPlayer
                 src={`/api/songs/${songId}/vocals`}
@@ -84,10 +103,10 @@ export default function VideoPreviewModal({
                 accentColor="vocals"
               />
             </div>
-          </>
+          </div>
         )}
 
-        {separationStatus && separationStatus !== 'completed' && (
+        {separationStatus && !showSeparated && (
           <div className="text-xs text-ink-3 bg-paper-2 rounded-md p-sm border border-border">
             {separationStatus === 'processing'
               ? '人声分离处理中，完成后可试听伴奏和人声。'

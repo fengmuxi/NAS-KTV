@@ -65,9 +65,14 @@ export const songsApi = {
     client
       .get<ApiResponse<{ content: string }>>(`/songs/${id}/lyrics/raw`)
       .then((res) => res.data.data),
-  saveLyrics: (id: number, content: string): Promise<{ lineCount: number }> =>
+  saveLyrics: (
+    id: number,
+    content: string,
+  ): Promise<{ lineCount: number; path: string }> =>
     client
-      .put<ApiResponse<{ lineCount: number }>>(`/songs/${id}/lyrics`, { content })
+      .put<ApiResponse<{ lineCount: number; path: string }>>(`/songs/${id}/lyrics`, {
+        content,
+      })
       .then((res) => res.data.data),
   clearLyrics: (id: number): Promise<void> =>
     client

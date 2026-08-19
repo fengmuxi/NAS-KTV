@@ -243,6 +243,7 @@ export default function Download() {
       setError('搜索提交失败，请检查下载服务');
       setSearching(false);
       searchingRef.current = false;
+      lastSearchKeyRef.current = null; // 失败后允许相同关键词重试
     }
   };
 
@@ -268,6 +269,7 @@ export default function Download() {
           setError(r.error || '搜索失败');
           setSearching(false);
           searchingRef.current = false;
+          lastSearchKeyRef.current = null; // 失败后允许相同关键词重试
           if (searchPollRef.current) {
             window.clearInterval(searchPollRef.current);
             searchPollRef.current = null;
@@ -276,6 +278,7 @@ export default function Download() {
           setError('搜索超时，请稍后重试');
           setSearching(false);
           searchingRef.current = false;
+          lastSearchKeyRef.current = null; // 失败后允许相同关键词重试
           if (searchPollRef.current) {
             window.clearInterval(searchPollRef.current);
             searchPollRef.current = null;
@@ -305,8 +308,6 @@ export default function Download() {
       }
       setTasks((prev) => ({ ...prev, ...initial }));
       setSelectedKeys(new Set());
-      // 立即打开下载详情，给出明确反馈（否则只是悄悄清空选择，用户以为没反应）
-      setDetailOpen(true);
     } catch {
       setError('提交下载失败');
     } finally {
@@ -321,6 +322,17 @@ export default function Download() {
     } catch {
       /* ignore */
     }
+  };
+
+  // 清除所有已下载完成的歌曲（仅移除前端任务展示，已落盘的文件保留）
+  const clearCompleted = () => {
+    setTasks((prev) => {
+      const next = { ...prev };
+      for (const [id, t] of Object.entries(prev)) {
+        if (t.status === 'completed') delete next[id];
+      }
+      return next;
+    });
   };
 
   const taskList = Object.values(tasks);
@@ -544,15 +556,27 @@ export default function Download() {
                   </span>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={() => setDetailOpen(false)}
-                aria-label="关闭"
-                className="inline-flex items-center justify-center w-8 h-8 rounded-md text-ink-2 hover:text-ink hover:bg-paper-2
-                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1 shrink-0">
+                {completedTasks > 0 && (
+                  <button
+                    type="button"
+                    onClick={clearCompleted}
+                    className="inline-flex items-center gap-1 text-xs text-ink-2 hover:text-accent rounded px-2 py-1.5
+                      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  >
+                    清除已完成
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setDetailOpen(false)}
+                  aria-label="关闭"
+                  className="inline-flex items-center justify-center w-8 h-8 rounded-md text-ink-2 hover:text-ink hover:bg-paper-2
+                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
             <div className="p-4 overflow-auto space-y-1">
               {taskList.length === 0 ? (

@@ -19,6 +19,10 @@ interface SearchableSelectProps {
   label?: string;
   multiple?: boolean;
   disabled?: boolean;
+  /** 允许创建新选项：搜索词无精确匹配时显示「回车创建」提示 */
+  creatable?: boolean;
+  /** 创建回调：输入词不在 options 中时回车触发（仅 creatable 时有效） */
+  onCreate?: (label: string) => void;
 }
 
 export default function SearchableSelect({
@@ -29,6 +33,8 @@ export default function SearchableSelect({
   label,
   multiple = false,
   disabled = false,
+  creatable = false,
+  onCreate,
 }: SearchableSelectProps) {
   const generatedId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -54,6 +60,13 @@ export default function SearchableSelect({
     const q = search.trim().toLowerCase();
     return options.filter(o => o.label.toLowerCase().includes(q));
   }, [options, search]);
+
+  // 可创建模式：输入词非空且不存在精确同名选项时，允许回车创建新项
+  const trimmedSearch = search.trim();
+  const canCreate =
+    creatable &&
+    trimmedSearch.length > 0 &&
+    !options.some(o => o.label.toLowerCase() === trimmedSearch.toLowerCase());
 
   const grouped = useMemo(() => {
     const groups: { group: string | null; items: { option: SearchableSelectOption; globalIndex: number }[] }[] = [];
@@ -118,6 +131,13 @@ export default function SearchableSelect({
         e.preventDefault();
         if (!open) {
           setOpen(true);
+          return;
+        }
+        if (canCreate) {
+          // 输入了不存在的新项：触发创建回调，随后关闭并清空输入
+          onCreate?.(trimmedSearch);
+          setSearch('');
+          setOpen(false);
           return;
         }
         if (activeIndex >= 0 && activeIndex < filtered.length) {
@@ -283,7 +303,13 @@ export default function SearchableSelect({
 
         {open && filtered.length === 0 && (
           <div className="absolute z-50 left-0 right-0 top-full mt-1 rounded-md border border-border bg-paper shadow-lg px-3 py-4 text-center text-sm text-ink-3">
-            无匹配结果
+            {canCreate ? (
+              <span>
+                回车创建「<span className="font-medium text-accent">{trimmedSearch}</span>」
+              </span>
+            ) : (
+              '无匹配结果'
+            )}
           </div>
         )}
       </div>

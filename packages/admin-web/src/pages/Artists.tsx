@@ -77,7 +77,7 @@ export default function Artists() {
     } finally {
       setLoading(false);
     }
-  }, [page, search]);
+  }, [page, pageSize, search]);
 
   useEffect(() => {
     fetchArtists();

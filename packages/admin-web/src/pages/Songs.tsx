@@ -235,7 +235,7 @@ export default function Songs() {
         if (showLoading) setLoading(false);
       }
     },
-    [page, keyword, artistId, selectedCategoryItemIds, showToast]
+    [page, pageSize, keyword, artistId, selectedCategoryItemIds, showToast]
   );
 
   useEffect(() => {
@@ -347,6 +347,37 @@ export default function Songs() {
     }
   };
 
+  // 编辑弹窗：输入不存在的歌手名回车时自动创建该歌手并选中
+  const handleCreateArtist = async (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const existed = artistsForModal.find(
+      (a) => a.name.toLowerCase() === trimmed.toLowerCase(),
+    );
+    if (existed) {
+      // 已存在同名歌手（如创建后 options 刷新）：直接选中
+      setEditForm((f) =>
+        f.artistIds.includes(String(existed.id))
+          ? f
+          : { ...f, artistIds: [...f.artistIds, String(existed.id)] },
+      );
+      return;
+    }
+    try {
+      const created = await artistsApi.create({ name: trimmed });
+      setArtistsForModal((prev) => [...prev, created]);
+      setEditForm((f) => ({
+        ...f,
+        artistIds: f.artistIds.includes(String(created.id))
+          ? f.artistIds
+          : [...f.artistIds, String(created.id)],
+      }));
+      showToast('success', `已创建歌手「${created.name}」`);
+    } catch {
+      showToast('error', '创建歌手失败');
+    }
+  };
+
   const handleSave = async () => {
     if (!editSong) return;
     setSaving(true);
@@ -400,9 +431,9 @@ export default function Songs() {
     if (!lyricsSong) return;
     setLyricsSaving(true);
     try {
-      const { lineCount } = await songsApi.saveLyrics(lyricsSong.id, lyricsContent);
+      const { lineCount, path } = await songsApi.saveLyrics(lyricsSong.id, lyricsContent);
       setLyricsLineCount(lineCount);
-      patchSong(lyricsSong.id, { lyricsPath: `${lyricsSong.id}.lrc` });
+      if (path) patchSong(lyricsSong.id, { lyricsPath: path });
       showToast('success', `歌词已保存（${lineCount} 行）`);
       fetchSongs();
     } catch (e: unknown) {
@@ -1029,6 +1060,8 @@ export default function Songs() {
             label="歌手（可多选，第一个为主歌手）"
             placeholder="搜索歌手..."
             multiple
+            creatable
+            onCreate={handleCreateArtist}
             options={artistsForModal.map(a => ({
               value: String(a.id),
               label: a.name,
