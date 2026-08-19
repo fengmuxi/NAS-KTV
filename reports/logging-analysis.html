@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NASKTV 日志系统分析与优化建议</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --panel: #f7f8fa;
+    --panel2: #eef1f4;
+    --border: #d8dde3;
+    --ink: #1f2937;
+    --ink2: #475569;
+    --ink3: #94a3b8;
+    --accent: #2563eb;
+    --info: #2563eb;
+    --warning: #d97706;
+    --danger: #dc2626;
+    --success: #16a34a;
+    --purple: #7c3aed;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.6; padding: 32px; max-width: 1000px; margin: 0 auto;
+  }
+  h1 { font-size: 26px; margin: 0 0 6px; }
+  .sub { color: var(--ink3); margin-bottom: 28px; }
+  h2 { font-size: 19px; margin: 32px 0 12px; padding-bottom: 6px; border-bottom: 2px solid var(--border); }
+  h3 { font-size: 15px; margin: 18px 0 8px; }
+  code { background: var(--panel2); padding: 1px 6px; border-radius: 4px; font-size: 12.5px; font-family: "SF Mono", Consolas, monospace; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin: 12px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--panel2); font-weight: 600; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; color: #fff; }
+  .p0 { background: var(--danger); }
+  .p1 { background: var(--warning); }
+  .p2 { background: var(--success); }
+  .badge-crit { background: #fee2e2; color: var(--danger); border: 1px solid var(--danger); }
+  .badge-ok { background: #dcfce7; color: var(--success); border: 1px solid var(--success); }
+  .kpi { display: flex; gap: 14px; flex-wrap: wrap; margin: 14px 0; }
+  .kpi .box { flex: 1; min-width: 150px; background: var(--panel2); border-radius: 10px; padding: 12px 14px; }
+  .kpi .n { font-size: 22px; font-weight: 700; }
+  .kpi .l { font-size: 12px; color: var(--ink3); }
+  ul { margin: 8px 0 8px 0; padding-left: 20px; }
+  li { margin: 6px 0; }
+  .note { font-size: 12.5px; color: var(--ink2); }
+  .mono { font-family: "SF Mono", Consolas, monospace; }
+  .flow { background: var(--panel2); border-radius: 8px; padding: 14px; font-size: 13px; margin: 10px  ​0; }
+</style>
+</head>
+<body>
+<h1>NASKTV 日志系统分析</h1>
+<div class="sub">现状梳理 · 排查痛点 · 优化方案（基于 <code>pacakges/backend</code> / <code>admin-web</code> / <code>separator</code> 实测代码）</div>
+
+<div class="kpi">
+  <div class="box"><div class="n">4</div><div class="l">日志相关文件</div></div>
+  <div class="box"><div class="n">2</div><div class="l">已接入服务（backend / separator）</div></div>
+  <div class="box"><div class="n">5000</div><div class="l">内存缓冲上限（无落盘）</div></div>
+  <div class="box"><div class="n">9</div><div class="l">已识别问题（3 个 P0/P1）</div></div>
+</div>
+
+<h2>一、现状架构</h2>
+<div class="card">
+<p>后端用 <code>pino</code> 输出，经过三层处理：</p>
+<ul>
+  <li><b>logger.ts</b>：<code>pino({level: LOG_LEVEL||'info'})</code> → <code>multistream([stdout, createLogTransport()])</code>。stdout 供容器采集；transport 把 JSON 行解析进内存 buffer（上限 5000）。</li>
+  <li><b>log-service.ts</b>：内存 <code>buffer[]</code> + WS 广播（<code>/ws/logs</code>）+ REST 查询/统计（<code>/system/logs</code>、<code>/system/logs/stats</code>）。</li>
+  <li><b>request-logger.ts</b>：每个请求 finish 后记录 method/url/status/耗时；<code>≥3000ms</code> 记为 warn（慢请求）。</li>
+  <li><b>separator-log-poller.ts</b>：每 5s 轮询 separator <code>:8001/api/logs?limit=50</code>，合并进同一 buffer（service=separator）。</li>
+  <li><b>admin-web Logs.tsx</b>：实时 WS + 历史 REST，支持 服务/级别/时间/关键字 过滤、关键字高亮、统计、自动滚动/暂停。</li>
+</ul>
+<div class="flow mono">
+backend logger ─► stdout (容器采集)  ┐<br/>
+                               └─► Transport ─► buffer[5000] ─► WS 推送 / REST 查询<br/>
+separator :8001 ─► poller 5s ─► addExternalEntry ─► buffer ─► 同上
+</div>
+</div>
+
+<h2>二、关键问题与排查痛点</h2>
+<table>
+  <thead><tr><th>优先级</th><th>问题</th><th>影响</th><th>根因 / 位置</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><span class="tag p0">P0</span></td>
+      <td><b>meta 信息完全不可见</b></td>
+      <td>后端 <code>logger.error({err}, msg)</code>、慢请求的 method/url/耗时 等结构化字段，前端 <code>Logs.tsx</code> 只渲染 <code>message</code>，丢掉 <code>entry.meta</code>。<b>错误栈、请求上下文在界面上完全看不到</b>，排查靠猜。</td>
+      <td><code>Logs.tsx</code> 列表渲染未读取 <code>entry.meta</code></td>
+    </tr>
+    <tr>
+      <td><span class="tag p1">P1</span></td>
+      <td><b>日志无持久化</b></td>
+      <td>仅内存 5000 条，进程重启即丢；无文件落盘。跨重启/多实例无法回溯历史，线上排障困难。</td>
+      <td><code>createLogTransport</code> 只入内存；无 file sink</td>
+    </tr>
+    <tr>
+      <td><span class="tag p1">P1</span></td>
+      <td><b>时间范围过滤的时区 bug</b></td>
+      <td>前端 <code>datetime-local</code>（本地时区）作为字符串，与后端 ISO UTC 字符串（如 <code>2026-08-19T02:00:00.000Z</code>）做字典序比较。<b>非 UTC 环境会误判，明明有日志却过滤为空。</b></td>
+      <td>前后端时间格式不一致，<code>log-service.queryLogs</code> 用字符串比较</td>
+    </tr>
+    <tr>
+      <td><span class="tag p2">P2</span></td>
+      <td><b>downloader 服务未接入</b></td>
+      <td>只有 backend + separator，musicdl 下载服务（<code>:8002</code>）日志看不到，下载失败无从定位。</td>
+      <td>无 downloader-log-poller；downloader 也未暴露 <code>/api/logs</code></td>
+    </tr>
+    <tr>
+      <td><span class="tag p2">P2</span></td>
+      <td><b>Separator 轮询去重脆弱</b></td>
+      <td>基于单一 <code>lastTimestamp</code> 字符串去重，同一毫秒的多条日志会被丢弃；separator 单次返回上限 50，5s 内超量会被截断丢失。</td>
+      <td><code>separator-log-poller.ts</code> 比较 <code>ts &lt;= lastTimestamp</code></td>
+    </tr>
+    <tr>
+      <td><span class="tag p2">P2</span></td>
+      <td><b>WS 实时流不支持时间/关键字服务端过滤</b></td>
+      <td>时间过滤仅在 REST 拉取生效；实时流只按 level/service 服务端过滤，关键字靠前端。停在历史区间时实时流仍推全量。</td>
+      <td><code>registerLogClient</code> 仅支持 level/service</td>
+    </tr>
+    <tr>
+      <td><span class="tag p2">P2</span></td>
+      <td><b>级别映射不严谨 + 默认不输出 debug</b></td>
+      <td><code>PINO_LEVEL_MAP</code> 把 pino 20(debug)/10(trace) 都映射成 debug，缺 trace；logger 默认 level=info，debug 需 <code>LOG_LEVEL=debug</code> 才出。</td>
+      <td><code>logger.ts</code> / <code>log-service.ts</code></td>
+    </tr>
+    <tr>
+      <td><span class="tag p2">P2</span></td>
+      <td><b>前端高亮用 <code>color-mix(oklch,…)</code></b></td>
+      <td>旧内核/部分浏览器不支持，降级可能失效或对比度异常。</td>
+      <td><code>Logs.tsx</code> highlightMatches 内联样式</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>三、优化建议（按优先级）</h2>
+
+<h3>P0 — 直接打通排查链路（半天级）</h3>
+<div class="card">
+<ul>
+  <li><b>渲染 meta</b>：<code>Logs.tsx</code> 在每条日志下折叠展示 <code>entry.meta</code>（尤其 <code>err</code> 栈、请求元数据），错误条目默认展开或用 <code>&lt;details&gt;</code> 折叠，避免刷屏。</li>
+  <li><b>修复时间过滤时区</b>：前端传 epoch ms（<code>Date.getTime()</code>）或后端用 <code>new Date()</code> 比较；不要做字符串比较。</li>
+</ul>
+</div>
+
+<h3>P1 — 补齐可用性与覆盖</h3>
+<div class="card">
+<ul>
+  <li><b>接入 downloader 日志</b>：给 downloader FastAPI 增加 <code>/api/logs</code>（仿 separator 的内存 handler），并新增 <code>downloader-log-poller.ts</code> 合并到 buffer，前端服务下拉增加 <code>downloader</code> 选项。</li>
+  <li><b>更稳的去重</b>：separator poller 用「时间戳 + 内容指纹」或 lastId 去重，避免同毫秒丢日志；适当提高 limit 或改增量游标。</li>
+  <li><b>可选落盘</b>：增加按日滚动的文件 sink（如 <code>pino/file</code> 或写入 <code>data/logs/</code>），或延长 buffer / 持久化到 SQLite，便于重启回溯。</li>
+</ul>
+</div>
+
+<h3>P2 — 体验打磨</h3>
+<div class="card">
+<ul>
+  <li>WS 服务端支持 keyword + 时间过滤，与 REST 拉取一致。</li>
+  <li>补全 trace 级别、提供运行时调级接口（<code>PATCH /system/logs/level</code>）。</li>
+  <li>增加「导出 JSON/CSV」按钮，方便贴给排查。</li>
+  <li>引入 requestId（traceId）贯穿请求链，便于串联一次操作的全部日志。</li>
+  <li>前端高亮改用纯色背景（如 <code>var(--color-warning)</code> 低透明度），去掉 oklch。</li>
+</ul>
+</div>
+
+<h2>四、落地顺序建议</h2>
+<ol>
+  <li>先做 P0：改 <code>Logs.tsx</code> 渲染 meta + 修时间过滤 → 立竿见影提升排障效率。</li>
+  <li>再补 P1：downloader 接入 + 落盘 → 覆盖全链路、可回溯。</li>
+  <li>最后 P2 打磨。</li>
+</ol>
+<p class="note">所有改动遵循项目约束：新增 schema 需迁移（本任务多为前端+后端 service，不改表）；前端走 Hallmark 规范；不改历史迁移文件。</p>
+
+</body>
+</html>

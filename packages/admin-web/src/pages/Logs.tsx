@@ -15,11 +15,12 @@ import {
   WifiOff,
   Inbox,
   RefreshCw,
+  Download,
 } from 'lucide-react';
 import Badge, { type BadgeVariant } from '../components/Badge';
 import Button from '../components/Button';
 import Loading from '../components/Loading';
-import { fetchLogs, fetchLogStats, connectLogStream } from '../api/logs';
+import { fetchLogs, fetchLogStats, connectLogStream, exportLogs } from '../api/logs';
 import type { LogEntry, LogQueryParams } from '../api/logs';
 
 const LEVEL_BADGE_VARIANT: Record<string, BadgeVariant> = {
@@ -55,6 +56,14 @@ function getLevelBorderClass(level: string): string {
 
 function getLevelBadgeVariant(level: string): BadgeVariant {
   return LEVEL_BADGE_VARIANT[level] ?? 'neutral';
+}
+
+function safeStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
 }
 
 function formatTimestamp(ts: string): string {
@@ -99,7 +108,7 @@ function highlightMatches(text: string, kw: string): React.ReactNode[] {
     parts.push(
       <mark
         key={key++}
-        style={{ backgroundColor: 'color-mix(in oklch, var(--color-warning) 30%, transparent)', color: 'inherit', borderRadius: '2px', padding: '0 1px' }}
+        style={{ backgroundColor: 'rgba(217, 119, 6, 0.22)', color: 'inherit', borderRadius: '2px', padding: '0 1px' }}
       >
         {text.slice(idx, idx + kw.length)}
       </mark>,
@@ -301,6 +310,23 @@ export default function Logs() {
     loadLogs().finally(() => setRefreshing(false));
   };
 
+  const handleExport = async (format: 'json' | 'csv') => {
+    try {
+      await exportLogs(
+        {
+          level: levelFilter || undefined,
+          service: serviceFilter || undefined,
+          keyword: keyword.trim() || undefined,
+          startTime: startTime || undefined,
+          endTime: endTime || undefined,
+        },
+        format,
+      );
+    } catch {
+      // ignore
+    }
+  };
+
   const toggleAutoScroll = () => {
     setAutoScroll((prev) => {
       const next = !prev;
@@ -378,6 +404,7 @@ export default function Logs() {
               <option value="">全部服务</option>
               <option value="backend">后端</option>
               <option value="separator">Separator</option>
+              <option value="downloader">Downloader</option>
             </select>
           </div>
 
@@ -502,6 +529,19 @@ export default function Logs() {
                 <div className="mt-1 text-sm text-ink font-mono break-all whitespace-pre-wrap leading-relaxed">
                   {keyword.trim() ? highlightMatches(entry.message, keyword.trim()) : entry.message}
                 </div>
+                {entry.meta && Object.keys(entry.meta).length > 0 && (
+                  <details
+                    className="mt-1 rounded border border-border bg-paper-3 px-2 py-1"
+                    open={entry.level === 'error'}
+                  >
+                    <summary className="cursor-pointer text-xs text-ink-3 hover:text-ink-2 select-none">
+                      {entry.level === 'error' ? '错误详情' : '元数据'}
+                    </summary>
+                    <pre className="mt-1 text-xs text-ink-2 font-mono break-all whitespace-pre-wrap leading-relaxed">
+                      {safeStringify(entry.meta)}
+                    </pre>
+                  </details>
+                )}
               </div>
             ))}
           </div>
@@ -556,6 +596,24 @@ export default function Logs() {
               aria-label="刷新日志"
             >
               刷新
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleExport('json')}
+              leftIcon={<Download className="w-4 h-4" aria-hidden="true" />}
+              aria-label="导出 JSON"
+            >
+              导出 JSON
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleExport('csv')}
+              leftIcon={<Download className="w-4 h-4" aria-hidden="true" />}
+              aria-label="导出 CSV"
+            >
+              导出 CSV
             </Button>
           </div>
 

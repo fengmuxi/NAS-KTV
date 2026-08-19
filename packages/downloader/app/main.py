@@ -17,6 +17,7 @@ import time
 import logging
 import threading
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -57,6 +58,31 @@ def _setup_logging() -> logging.Logger:
 
 
 logger = _setup_logging()
+
+
+class MemoryLogHandler(logging.Handler):
+    """内存日志缓冲，供后端日志面板通过 /api/logs 拉取（仿 separator 实现）。"""
+
+    def __init__(self, max_size: int = 2000):
+        super().__init__()
+        self.max_size = max_size
+        self.logs: list[dict] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        entry = {
+            'timestamp': datetime.fromtimestamp(record.created).isoformat(),
+            'level': record.levelname.lower(),
+            'message': self.format(record),
+            'logger': record.name,
+        }
+        self.logs.append(entry)
+        if len(self.logs) > self.max_size:
+            self.logs = self.logs[-self.max_size:]
+
+
+memory_handler = MemoryLogHandler(max_size=2000)
+memory_handler.setFormatter(logging.Formatter('%(message)s'))
+logger.addHandler(memory_handler)
 
 from .models import (
     ConfigRequest,
@@ -298,3 +324,15 @@ def cancel(task_id: str):
         raise HTTPException(status_code=404, detail='task not found or already terminal')
     logger.info('cancel ok task_id=%s', task_id)
     return {'task_id': task_id, 'status': 'cancelled'}
+
+
+@app.get('/api/logs')
+def get_logs(level: str = None, limit: int = 100):
+    """内存日志快照，供后端日志面板轮询（结构与 separator /api/logs 一致）。"""
+    logs = memory_handler.logs
+    if level:
+        level_order = {'debug': 10, 'info': 20, 'warning': 30, 'error': 40}
+        min_level = level_order.get(level.lower(), 0)
+        level_map = {'debug': 10, 'info': 20, 'warning': 30, 'error': 40, 'critical': 50}
+        logs = [l for l in logs if level_map.get(l['level'], 0) >= min_level]
+    return {'logs': logs[-limit:]}

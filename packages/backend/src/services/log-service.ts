@@ -135,8 +135,8 @@ export function queryLogs(filters: {
   level?: string;
   service?: string;
   keyword?: string;
-  startTime?: string;
-  endTime?: string;
+  startTime?: string | number;
+  endTime?: string | number;
   limit?: number;
   offset?: number;
 }): LogEntry[] {
@@ -152,16 +152,21 @@ export function queryLogs(filters: {
 
   const minPriority = level ? (LEVEL_PRIORITY[level] ?? 0) : 0;
   const lowerKeyword = keyword ? keyword.toLowerCase() : null;
+  // 统一按绝对时间戳（epoch ms）比较，避免 ISO 字符串与本地 datetime-local
+  // 做字典序比较在非 UTC 环境下误判的问题。
+  const startMs = startTime != null ? new Date(startTime as string | number).getTime() : null;
+  const endMs = endTime != null ? new Date(endTime as string | number).getTime() : null;
 
   const filtered: LogEntry[] = [];
   for (let i = buffer.length - 1; i >= 0; i--) {
     const entry = buffer[i];
+    const entryMs = new Date(entry.timestamp).getTime();
 
-    if (startTime && entry.timestamp < startTime) {
+    if (startMs != null && entryMs < startMs) {
       continue;
     }
 
-    if (endTime && entry.timestamp > endTime) {
+    if (endMs != null && entryMs > endMs) {
       continue;
     }
 

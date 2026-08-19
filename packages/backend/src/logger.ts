@@ -14,6 +14,15 @@ export function getLogger(): Logger {
   return _logger;
 }
 
+/** 运行时动态调整 pino 日志级别（无需重启）。仅影响后端自身 logger。 */
+export function setLogLevel(level: string): void {
+  const allowed = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'];
+  if (!allowed.includes(level)) {
+    throw new Error(`invalid level: ${level}`);
+  }
+  _logger.level = level;
+}
+
 const logger: Record<string, unknown> = {};
 
 export default new Proxy(logger, {

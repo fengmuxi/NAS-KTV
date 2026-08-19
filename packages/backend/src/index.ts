@@ -19,6 +19,7 @@ import { aiParseQueue } from './services/ai-queue';
 import { findExpiringSoonRooms, revokeExpiredAuthorizations, closeIdleAndStaleRooms } from './services/room-service';
 import { createLogTransport, logService } from './services/log-service';
 import { startSeparatorLogPoller, stopSeparatorLogPoller } from './services/separator-log-poller';
+import { startDownloaderLogPoller, stopDownloaderLogPoller } from './services/downloader-log-poller';
 import { startDiscoveryBroadcast } from './services/discovery';
 
 // 全局兜底：异步 handler 中未捕获的错误不应导致进程退出
@@ -197,14 +198,18 @@ async function main() {
 
     // 启动 Separator 日志轮询器
     startSeparatorLogPoller();
+    // 启动 Downloader 日志轮询器
+    startDownloaderLogPoller();
 
     process.on('SIGTERM', () => {
       clearInterval(expiringTimer);
       stopSeparatorLogPoller();
+      stopDownloaderLogPoller();
     });
     process.on('SIGINT', () => {
       clearInterval(expiringTimer);
       stopSeparatorLogPoller();
+      stopDownloaderLogPoller();
     });
   } catch (err) {
     logger.error(err, 'Failed to start server');

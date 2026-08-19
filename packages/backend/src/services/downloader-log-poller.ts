@@ -2,7 +2,7 @@ import http from 'http';
 import { addExternalEntry } from './log-service';
 import logger from '../logger';
 
-const SEPARATOR_URL = process.env.SEPARATOR_SERVICE_URL || 'http://localhost:8001';
+const DOWNLOADER_URL = process.env.DOWNLOADER_SERVICE_URL || 'http://localhost:8002';
 const POLL_INTERVAL_MS = 5000;
 const POLL_LIMIT = 200;
 
@@ -28,7 +28,7 @@ function mapLevel(raw: string): 'debug' | 'info' | 'warn' | 'error' {
 }
 
 function poll(): void {
-  const url = new URL('/api/logs', SEPARATOR_URL);
+  const url = new URL('/api/logs', DOWNLOADER_URL);
   url.searchParams.set('limit', String(POLL_LIMIT));
 
   const req = http.get(
@@ -58,7 +58,7 @@ function poll(): void {
             addExternalEntry({
               timestamp: ts,
               level: mapLevel(item.level || 'info'),
-              service: 'separator',
+              service: 'downloader',
               message: item.message || item.msg || '',
               ...(item.logger ? { meta: { logger: item.logger } } : {}),
             });
@@ -82,16 +82,16 @@ function poll(): void {
   });
 }
 
-export function startSeparatorLogPoller(): void {
+export function startDownloaderLogPoller(): void {
   if (timer) return;
   timer = setInterval(poll, POLL_INTERVAL_MS);
-  logger.info('Separator log poller started');
+  logger.info('Downloader log poller started');
 }
 
-export function stopSeparatorLogPoller(): void {
+export function stopDownloaderLogPoller(): void {
   if (timer) {
     clearInterval(timer);
     timer = null;
-    logger.info('Separator log poller stopped');
+    logger.info('Downloader log poller stopped');
   }
 }
