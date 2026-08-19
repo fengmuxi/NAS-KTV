@@ -12,8 +12,10 @@ Downloader 微服务入口（FastAPI）。
 """
 import os
 import re
-import logging
 import sys
+import time
+import logging
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -74,6 +76,7 @@ from .downloader import (
     submit_search,
     enabled_keys,
     get_cached_song,
+    get_client,
     set_enabled_sources,
 )
 from .worker import worker
@@ -100,11 +103,32 @@ _load_env()
 DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def _prewarm_clients():
+    """后台预热：提前构建各启用源（及全量组合）的 MusicClient 并写入缓存，
+    消除用户首次搜索时的客户端构建卡顿。单源初始化异常不致命，不影响服务启动。
+
+    注意：这只是预热「客户端构建」这一步；真正的搜索结果不预取（关键词未知）。
+    """
+    keys = enabled_keys()
+    targets = [[k] for k in keys] + [list(keys)]
+    for src in targets:
+        try:
+            t0 = time.time()
+            get_client(src)
+            logger.info('[step=prewarm] built client for %s elapsed=%.2fs', src, time.time() - t0)
+        except Exception as err:  # noqa: BLE001 - 单源失败不影响其它源/启动
+            logger.warning('[step=prewarm] failed for %s (ignored): %s', src, repr(err)[:200])
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info('Starting NASKTV Downloader Service')
     logger.info('download_dir=%s', DOWNLOAD_DIR)
     logger.info('enabled_sources=%s', ','.join(enabled_keys()) or '(all)')
+    # 后台预热客户端缓存（不阻塞启动；可被 SEARCH_PREWARM=false 关闭）
+    if os.environ.get('SEARCH_PREWARM', 'true').lower() != 'false':
+        threading.Thread(target=_prewarm_clients, name='dl-prewarm', daemon=True).start()
+        logger.info('[step=prewarm] scheduled in background')
     yield
     logger.info('Shutting down NASKTV Downloader Service')
 

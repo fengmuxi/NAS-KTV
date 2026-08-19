@@ -190,6 +190,10 @@ docker compose logs -f downloader
 | `DOWNLOADER_SERVICE_URL` | `http://downloader:8002` | 下载服务地址（Docker 自动设为容器名） |
 | `DOWNLOAD_CONCURRENCY` | `2` | 最大并发下载数（防止压垮人声分离队列） |
 | `ENABLED_SOURCES` | 留空（启用全部） | 启用的音乐平台源，逗号分隔的 musicdl 短名：`qq,kugou,kuwo,netease,soda,fivesing,bodian` |
+| `SEARCH_SIZE_PER_SOURCE` | `5` | 每源搜索结果条数（越少越快，够选曲即可） |
+| `SEARCH_MAX_RETRIES` | `1` | 搜索失败重试次数（搜索非下载，重试会放大尾延迟） |
+| `SEARCH_CACHE_TTL` | `300` | 搜索结果缓存秒数，相同关键词重复搜索秒回 |
+| `SEARCH_PREWARM` | `true` | 启动预热各源 MusicClient 缓存，消除首次搜索构建卡顿（设 `false` 关闭） |
 
 兼容的 AI 服务商：OpenAI / DeepSeek / 通义千问 / Moonshot / 本地 Ollama 等。
 

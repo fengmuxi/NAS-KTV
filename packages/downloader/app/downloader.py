@@ -10,6 +10,7 @@ musicdl 封装层：构建 MusicClient、执行搜索、缓存结果、把歌曲
   我们只需把 song.work_dir 改到目标目录即可控制落盘位置。
 """
 import os
+import copy
 import threading
 import time
 import logging
@@ -37,6 +38,24 @@ except Exception:  # pragma: no cover - 极少数环境缺 rich 时退回官方 
     _HAVE_RICH = False
 
 logger = logging.getLogger(__name__)
+
+
+# musicdl 会在 work_dir 下无条件把搜索/下载结果 pickle 成 *.pkl（base.py:184/258）。
+# 这些盘上 pkl 既没有被我们读取（结果缓存在内存 SEARCH_RESULT_CACHE），
+# 又会随每次搜索无限累积磁盘，因此在此全局禁用其落盘写。
+def _disable_musicdl_disk_cache() -> None:
+    try:
+        from musicdl.modules.sources import base as _mdl_base
+
+        _mdl_base.BaseMusicClient._savetopkl = (  # type: ignore[attr-defined]
+            lambda self, data, file_path, auto_sanitize=True: None
+        )
+        logger.info('[step=config] musicdl 落盘缓存已禁用（_savetopkl -> no-op）')
+    except Exception as exc:  # pragma: no cover - 极少数环境差异
+        logger.warning('[step=config] 禁用 musicdl 落盘缓存失败：%s', exc)
+
+
+_disable_musicdl_disk_cache()
 
 
 def _song_summary(song, idx: int | None = None) -> str:
@@ -150,8 +169,10 @@ def get_client(sources: Optional[List[str]] = None) -> MusicClient:
             cfg[SOURCES[k]] = {
                 'work_dir': str(DOWNLOAD_DIR / k),
                 'disable_print': True,
-                'search_size_per_source': 10,
-                'max_retries': 3,
+                # 每源抓取的结果条数：默认 5（足够 KTV 选曲，越少越快）。可用 SEARCH_SIZE_PER_SOURCE 调。
+                'search_size_per_source': int(os.environ.get('SEARCH_SIZE_PER_SOURCE', '5')),
+                # 搜索失败重试次数：默认 1（搜索非下载，重试收益低却显著放大尾延迟）。可用 SEARCH_MAX_RETRIES 调。
+                'max_retries': int(os.environ.get('SEARCH_MAX_RETRIES', '1')),
             }
         logger.info('[step=client/init] building MusicClient for %d source(s): %s', len(classes), classes)
         logger.debug('[step=client/init] work_dirs: %s', {k: str(DOWNLOAD_DIR / k) for k in keys})
@@ -165,6 +186,32 @@ def get_client(sources: Optional[List[str]] = None) -> MusicClient:
 SEARCH_TASKS: Dict[str, dict] = {}
 SEARCH_TASKS_LOCK = threading.Lock()
 _search_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix='dl-search')
+
+# ---- 搜索结果缓存：按 (关键词归一, 源集合) 缓存 musicdl 的原始结果，避免相同关键词重复爬网 ----
+# 命中即跳过网络请求，重复搜索秒回。值 = (过期时间戳, {源类名: [SongInfo]})。
+SEARCH_RESULT_CACHE: Dict[tuple, tuple] = {}
+SEARCH_RESULT_CACHE_LOCK = threading.Lock()
+SEARCH_CACHE_TTL = float(os.environ.get('SEARCH_CACHE_TTL', '300'))  # 秒，默认 5 分钟
+
+
+def _search_cache_key(keyword: str, sources: Optional[List[str]]) -> tuple:
+    norm = (keyword or '').strip().lower()
+    src = frozenset(sources) if sources else frozenset(enabled_keys())
+    return (norm, src)
+
+
+def _search_cache_get(keyword: str, sources: Optional[List[str]]):
+    key = _search_cache_key(keyword, sources)
+    with SEARCH_RESULT_CACHE_LOCK:
+        entry = SEARCH_RESULT_CACHE.get(key)
+        if entry and entry[0] > time.time():
+            return key, entry[1]
+    return key, None
+
+
+def _search_cache_put(key, results: Dict[str, list]) -> None:
+    with SEARCH_RESULT_CACHE_LOCK:
+        SEARCH_RESULT_CACHE[key] = (time.time() + SEARCH_CACHE_TTL, results)
 
 
 def _search_sources(client: MusicClient, keyword: str, search_id: str) -> Dict[str, list]:
@@ -223,7 +270,19 @@ def _search_sources(client: MusicClient, keyword: str, search_id: str) -> Dict[s
 
 
 def _do_search_sync(keyword: str, sources, search_id: str) -> Dict:
-    """执行 musicdl 搜索并将结果按 search_id 写入 SEARCH_CACHE（供后续下载提交按 key 取用）。"""
+    """执行 musicdl 搜索并将结果按 search_id 写入 SEARCH_CACHE（供后续下载提交按 key 取用）。
+
+    先查缓存：相同 (关键词, 源集合) 且未过期的搜索直接复用，跳过网络请求（重复搜索秒回）。
+    命中时深拷贝一份给本 search_id——因为 prepare_song 会改写 song.work_dir/_save_path，
+    不能让下载污染共享的缓存对象。
+    """
+    cache_key, cached = _search_cache_get(keyword, sources)
+    if cached is not None:
+        logger.info('[step=search/cache-hit] search_id=%s keyword=%r sources=%s', search_id, keyword, sources or '(all)')
+        with SEARCH_CACHE_LOCK:
+            SEARCH_CACHE[search_id] = copy.deepcopy(cached)
+        return SEARCH_CACHE[search_id]
+
     client = get_client(sources)
     wanted_classes = list(client.music_sources)
     logger.info('[step=search/run] search_id=%s keyword=%r sources=%s', search_id, keyword, wanted_classes)
@@ -231,6 +290,7 @@ def _do_search_sync(keyword: str, sources, search_id: str) -> Dict:
     results = _search_sources(client, keyword, search_id)
     elapsed = time.time() - t0
     # results 已是请求源的子集，无需再过滤
+    _search_cache_put(cache_key, results)
     with SEARCH_CACHE_LOCK:
         SEARCH_CACHE[search_id] = results
     logger.info(

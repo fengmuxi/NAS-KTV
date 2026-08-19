@@ -83,7 +83,13 @@ function CircularDownloadButton({
           style={{ transition: 'stroke-dashoffset 0.4s ease' }}
         />
       </svg>
-      <DownloadIcon className={['w-4 h-4 text-ink', active ? 'animate-pulse' : ''].join(' ')} />
+      {total > 0 ? (
+        <span className="text-[11px] font-semibold text-accent tabular-nums">
+          {completed}/{total}
+        </span>
+      ) : (
+        <DownloadIcon className={['w-4 h-4 text-ink', active ? 'animate-pulse' : ''].join(' ')} />
+      )}
     </button>
   );
 }
@@ -102,6 +108,10 @@ export default function Download() {
   const [searched, setSearched] = useState(false);
   const pollRef = useRef<number | null>(null);
   const searchPollRef = useRef<number | null>(null);
+  // 防抖：用 ref 同步记录「搜索进行中」，避免快速重复触发（React state 异步更新期间漏拦）
+  const searchingRef = useRef(false);
+  // 记录上次成功提交的查询（关键词|排序后的源集合），相同查询直接复用结果、不重复提交
+  const lastSearchKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,8 +152,11 @@ export default function Download() {
   );
 
   // 轮询任务状态直到全部结束
+  // 依赖用「活跃任务 id 拼接串」而非 length：避免下载中新增任务导致闭包捕获的旧 id 列表
+  // 漏轮询（stale-closure），从而出现「提交成功却一直不更新进度」的假象。
+  const activeIdsKey = activeTaskIds.join(',');
   useEffect(() => {
-    if (activeTaskIds.length === 0) {
+    if (!activeIdsKey) {
       if (pollRef.current) {
         window.clearInterval(pollRef.current);
         pollRef.current = null;
@@ -169,7 +182,7 @@ export default function Download() {
         pollRef.current = null;
       }
     };
-  }, [activeTaskIds.length]);
+  }, [activeIdsKey]);
 
   // 详情弹框：ESC 关闭
   useEffect(() => {
@@ -207,19 +220,29 @@ export default function Download() {
   const clearAll = () => setSelectedKeys(new Set());
 
   const doSearch = async () => {
-    if (!keyword.trim()) return;
+    const kw = keyword.trim();
+    if (!kw) return;
+    if (searchingRef.current) return; // 防抖：搜索进行中，忽略重复触发
+    const sources = platforms.filter((p) => selectedSources.has(p.key)).map((p) => p.key);
+    const key = `${kw}|${[...selectedSources].sort().join(',')}`;
+    // 相同查询（关键词+源组合）且已有结果：直接复用，避免重复提交与轮询
+    if (lastSearchKeyRef.current === key && searched) {
+      return;
+    }
+    searchingRef.current = true;
     setSearching(true);
     setError(null);
     setResults([]);
     setSelectedKeys(new Set());
     setSearched(true);
+    lastSearchKeyRef.current = key;
     try {
-      const sources = platforms.filter((p) => selectedSources.has(p.key)).map((p) => p.key);
-      const data = await downloadApi.searchSubmit(keyword.trim(), sources.length ? sources : undefined);
+      const data = await downloadApi.searchSubmit(kw, sources.length ? sources : undefined);
       pollSearch(data.search_id);
     } catch {
       setError('搜索提交失败，请检查下载服务');
       setSearching(false);
+      searchingRef.current = false;
     }
   };
 
@@ -236,6 +259,7 @@ export default function Download() {
           setResults(r.results);
           setSelectedKeys(new Set());
           setSearching(false);
+          searchingRef.current = false;
           if (searchPollRef.current) {
             window.clearInterval(searchPollRef.current);
             searchPollRef.current = null;
@@ -243,6 +267,7 @@ export default function Download() {
         } else if (r.status === 'failed') {
           setError(r.error || '搜索失败');
           setSearching(false);
+          searchingRef.current = false;
           if (searchPollRef.current) {
             window.clearInterval(searchPollRef.current);
             searchPollRef.current = null;
@@ -250,6 +275,7 @@ export default function Download() {
         } else if (attempts >= MAX_ATTEMPTS) {
           setError('搜索超时，请稍后重试');
           setSearching(false);
+          searchingRef.current = false;
           if (searchPollRef.current) {
             window.clearInterval(searchPollRef.current);
             searchPollRef.current = null;
@@ -279,6 +305,8 @@ export default function Download() {
       }
       setTasks((prev) => ({ ...prev, ...initial }));
       setSelectedKeys(new Set());
+      // 立即打开下载详情，给出明确反馈（否则只是悄悄清空选择，用户以为没反应）
+      setDetailOpen(true);
     } catch {
       setError('提交下载失败');
     } finally {
@@ -536,29 +564,46 @@ export default function Download() {
                   return (
                     <div
                       key={t.task_id}
-                      className="flex items-center gap-3 px-3 py-2 rounded-md border border-border"
+                      className="px-3 py-2 rounded-md border border-border space-y-1.5"
                     >
-                      <span className={`inline-flex items-center gap-1.5 text-sm ${meta.cls}`}>
-                        {meta.icon}
-                        {meta.label}
-                      </span>
-                      <span className="flex-1 text-sm text-ink truncate">
-                        {t.song_name || t.task_id}
-                        {t.singers ? ` - ${t.singers}` : ''}
-                      </span>
-                      {t.status === 'failed' && t.error && (
-                        <span className="text-xs text-danger truncate max-w-[40%]">{t.error}</span>
-                      )}
-                      {!terminal && (
-                        <button
-                          type="button"
-                          onClick={() => doCancel(t.task_id)}
-                          className="text-xs text-ink-2 hover:text-danger rounded px-2 py-1 shrink-0
-                            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                        >
-                          取消
-                        </button>
-                      )}
+                      <div className="flex items-center gap-3">
+                        <span className={`inline-flex items-center gap-1.5 text-sm ${meta.cls} shrink-0`}>
+                          {meta.icon}
+                          {meta.label}
+                        </span>
+                        <span className="flex-1 text-sm text-ink truncate">
+                          {t.song_name || t.task_id}
+                          {t.singers ? ` - ${t.singers}` : ''}
+                        </span>
+                        {t.status === 'failed' && t.error && (
+                          <span className="text-xs text-danger truncate max-w-[40%]">{t.error}</span>
+                        )}
+                        {!terminal && (
+                          <button
+                            type="button"
+                            onClick={() => doCancel(t.task_id)}
+                            className="text-xs text-ink-2 hover:text-danger rounded px-2 py-1 shrink-0
+                              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                          >
+                            取消
+                          </button>
+                        )}
+                      </div>
+                      {/* 进度条：完成/失败/取消=满格；下载中=accent 半透明脉冲（不确定进度）；等待中=空轨道 */}
+                      <div className="h-1.5 w-full rounded-full overflow-hidden bg-[color-mix(in_oklch,var(--color-ink)_12%,transparent)]">
+                        {t.status === 'completed' && (
+                          <div className="h-full bg-success" style={{ width: '100%' }} />
+                        )}
+                        {t.status === 'processing' && (
+                          <div className="h-full w-full bg-[color-mix(in_oklch,var(--color-accent)_35%,transparent)] animate-pulse" />
+                        )}
+                        {t.status === 'failed' && (
+                          <div className="h-full bg-danger" style={{ width: '100%' }} />
+                        )}
+                        {(t.status === 'cancelled' || t.status === 'pending') && (
+                          <div className="h-full bg-ink-2" style={{ width: '100%' }} />
+                        )}
+                      </div>
                     </div>
                   );
                 })
