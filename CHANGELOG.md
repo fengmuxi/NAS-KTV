@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.5.0](https://github.com/fengmuxi/NAS-KTV/compare/v0.4.0...v0.5.0) (2026-08-19)
+
+
+### Features
+
+* **admin-web:** 歌曲下载页搜索空状态与初始引导 ([bc8ca6f](https://github.com/fengmuxi/NAS-KTV/commit/bc8ca6fcbb7a5df188566b2b3ce7472a99d578ec))
+* **admin-web:** 歌曲管理 AI 解析/人声分离按钮添加二次确认弹窗 ([d2ccc00](https://github.com/fengmuxi/NAS-KTV/commit/d2ccc006f479edefdb569db037faf71c711f75ce))
+* **admin-web:** 歌曲管理界面新增手动刷新按钮 ([deb6953](https://github.com/fengmuxi/NAS-KTV/commit/deb6953b9cee56f0a7c0b80d68b7fd1ad58e5844))
+* **admin-web:** 统一分页组件并支持每页条数选择 ([36c29c8](https://github.com/fengmuxi/NAS-KTV/commit/36c29c8cb2a7fb8890feee9e8e11851f56cde627))
+* **admin-web:** 设备列表实时显示在线状态与房间人数 ([9becedb](https://github.com/fengmuxi/NAS-KTV/commit/9becedb5b3b5eadeabcf48d859983d9ecf2848b9))
+* **admin:** 下载页优化（失败重试/进度条/清除已完成）+ 歌手回车创建 + 分页修复 + MV 预览美化 ([eb5a2e3](https://github.com/fengmuxi/NAS-KTV/commit/eb5a2e34495ff14539a764209bff5d3a12a03a6c))
+* **admin:** 仪表盘新增服务健康状态显示 ([9aaa7cd](https://github.com/fengmuxi/NAS-KTV/commit/9aaa7cd2a121ef904517ab711c8eba17f66dcb5e))
+* **admin:** 日志查询与轮询（backend logs API + admin 日志页 + 下载/分离日志轮询） ([be91dd3](https://github.com/fengmuxi/NAS-KTV/commit/be91dd3818d16dab0820ed623604d082ed52e76c))
+* **ai-parse:** 歌曲管理页直接审核 AI 解析结果 ([66440ff](https://github.com/fengmuxi/NAS-KTV/commit/66440ffdedb97c08ed08e59176f1812153142273))
+* **backend:** 删除歌曲时自动清理 data/separation/song_&lt;id&gt; 分离产物 ([7037e22](https://github.com/fengmuxi/NAS-KTV/commit/7037e2237e015269f62e3b5d0f66483e32c94f73))
+* **backend:** 扫描时提取内嵌歌词 ([77a8d6d](https://github.com/fengmuxi/NAS-KTV/commit/77a8d6d613b4b01524a387e74ad4e8b078e87a99))
+* **backend:** 歌曲列表按加入时间倒序（created_at 默认值 + 迁移 0013 触发器兜底） ([863b456](https://github.com/fengmuxi/NAS-KTV/commit/863b45630063008f902518ba45865c274b3d8c12))
+* **backend:** 顶歌不限归属 + 扫码重加 session 归属继承（防止重复 session 堆积） ([f6cabe6](https://github.com/fengmuxi/NAS-KTV/commit/f6cabe6e922a37c90e88edb738e4538749118efa))
+* **downloader:** 搜索提速（服务端缓存+降量重试+预热）与下载反馈优化 ([415dcae](https://github.com/fengmuxi/NAS-KTV/commit/415dcaef623eb83203adac1a426bb6be448b67f3))
+* **downloader:** 集成歌曲下载微服务并支持后台配置音乐源与并发 ([2aa91b6](https://github.com/fengmuxi/NAS-KTV/commit/2aa91b67f095c7ec90679c32e87c4b74da66f9e9))
+* **mobile-h5:** 顶歌修复（行禁用分离/反馈/不限归属）+ 遥控器 tab/拖动 + 歌词高亮 + 扫码重进 + 歌手搜索 ([e353099](https://github.com/fengmuxi/NAS-KTV/commit/e353099cf17903e646bc6f00d424914844c1e97b))
+* **tv-app:** 播放可视化动画美化 + 歌词偏移重置广播同步修复 ([7673045](https://github.com/fengmuxi/NAS-KTV/commit/76730451c275110e2bd726a6b745ba3c761d63c5))
+
+
+### Bug Fixes
+
+* **admin-web:** Badge 中文标签被列宽挤压换行 ([bd2b4ef](https://github.com/fengmuxi/NAS-KTV/commit/bd2b4efc360e35f29dba612553e51efc4bbb0321))
+* **admin-web:** 修复仪表盘刷新按钮无动画 ([d597da0](https://github.com/fengmuxi/NAS-KTV/commit/d597da070c72b0810a3bb5dda5fc7231921d255a))
+* **admin-web:** 手动刷新按钮增加加载动画 ([d2299d2](https://github.com/fengmuxi/NAS-KTV/commit/d2299d23cf9809a07ce51cc914ddc54e56239616))
+* **admin-web:** 批量重试按钮增加加载动画 ([0d2d350](https://github.com/fengmuxi/NAS-KTV/commit/0d2d35026f848b9553e1020845ebc0d4e0a473dc))
+* **admin:** 修复设备授权撤销后列表不刷新 ([2e1c5bf](https://github.com/fengmuxi/NAS-KTV/commit/2e1c5bf08de2b95cf488e5438a539e1acd63a495))
+* **db:** 为迁移 0012 添加 statement-breakpoint 以修复启动报错 ([a47194c](https://github.com/fengmuxi/NAS-KTV/commit/a47194c23cd096b3e410c81f76811a828cef3dd4))
+* **lyrics:** SYLT 同步歌词解析修复 + 歌词统一为音频同目录同名 lrc 布局 ([9ce19c7](https://github.com/fengmuxi/NAS-KTV/commit/9ce19c7a486b23d6a47a447ab6f6e37efc7096b7))
+* **separator:** 分离完成后删除 wav 中间产物，重分离直接删旧结果 ([055eeac](https://github.com/fengmuxi/NAS-KTV/commit/055eeace69a96294eb153fffc2b24556e72b6762))
+* **tv:** 修复 logo 跨源被 CORP 拦截，二维码改为屏幕自适应大小 ([1c2a303](https://github.com/fengmuxi/NAS-KTV/commit/1c2a303cf9e94737ef31e980c8221a41564a3143))
+
 ## [0.4.0](https://github.com/fengmuxi/NAS-KTV/compare/v0.3.13...v0.4.0) (2026-08-14)
 
 
