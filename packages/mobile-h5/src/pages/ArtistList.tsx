@@ -4,6 +4,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Search } from 'lucide-react';
 import { artistsApi } from '../api/artists';
 import BottomNav from '../components/BottomNav';
 import Skeleton from '../components/Skeleton';
@@ -110,8 +111,9 @@ const css = `
 .al-index-bar {
   position: fixed;
   right: 0;
-  top: 50%;
-  transform: translateY(-50%);
+  top: auto;
+  bottom: calc(100px + env(safe-area-inset-bottom)); /* 位于底部导航上方，避免被遮挡 */
+  transform: none;
   z-index: var(--z-dropdown);
   display: flex;
   flex-direction: column;
@@ -126,13 +128,56 @@ const css = `
   border-radius: var(--radius-md) 0 0 var(--radius-md);
   box-shadow: -2px 0 8px oklch(20% 0.02 145 / 0.06);
   touch-action: none;
+  max-height: calc(100vh - 150px);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.al-index-bar::-webkit-scrollbar {
+  display: none;
+}
+
+/* 歌手搜索框 */
+.al-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  background-color: var(--color-paper-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: 0 var(--space-md);
+  margin-top: var(--space-md);
+  max-width: 440px; /* 限制宽度，避免在宽屏/横屏下过宽 */
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+.al-search:focus-within {
+  border-color: var(--color-accent);
+}
+.al-search-icon {
+  color: var(--color-ink-3);
+  flex-shrink: 0;
+}
+.al-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 10px 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  min-width: 0;
+}
+.al-search-input::placeholder {
+  color: var(--color-ink-3);
+}
+.al-search-input::-webkit-search-cancel-button {
+  display: none;
 }
 .al-index-letter {
   display: flex;
   align-items: center;
   justify-content: center;
   min-width: 44px;
-  min-height: 28px;
+  min-height: 22px;
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 500;
@@ -229,6 +274,7 @@ export default function ArtistList() {
   const [loading, setLoading] = useState(true);
   const [activeLetter, setActiveLetter] = useState<string | null>(null);
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [searchKeyword, setSearchKeyword] = useState('');
   const observerRef = useRef<IntersectionObserver | null>(null);
 
   useEffect(() => {
@@ -243,7 +289,13 @@ export default function ArtistList() {
     load();
   }, []);
 
-  const grouped = artists.reduce((acc, artist) => {
+  // 歌手搜索：按名称模糊过滤（不区分大小写），过滤后字母分组随之收窄
+  const searchQ = searchKeyword.trim().toLowerCase();
+  const visibleArtists = searchQ
+    ? artists.filter((a) => a.name.toLowerCase().includes(searchQ))
+    : artists;
+
+  const grouped = visibleArtists.reduce((acc, artist) => {
     const letter = (artist.firstLetter || '#').toUpperCase();
     if (!acc[letter]) acc[letter] = [];
     acc[letter].push(artist);
@@ -296,7 +348,7 @@ export default function ArtistList() {
     <div className="min-h-screen bg-paper pb-20" style={{ paddingBottom: 'calc(100px + env(safe-area-inset-bottom))' }}>
       <style>{css}</style>
 
-      <div style={{ padding: 'var(--space-xl)', paddingTop: 'calc(env(safe-area-inset-top) + var(--space-2xl))' }}>
+      <div style={{ padding: 'var(--space-xl)', paddingTop: 'calc(env(safe-area-inset-top) + var(--space-2xl))', paddingRight: 'calc(var(--space-xl) + 44px)' }}>
         <div className="al-title-row">
           <h1 style={{
             fontFamily: 'var(--font-display)',
@@ -311,6 +363,18 @@ export default function ArtistList() {
             <span className="al-title-count">{artists.length} 位</span>
           )}
         </div>
+
+        <div className="al-search">
+          <Search size={16} strokeWidth={1.8} className="al-search-icon" />
+          <input
+            value={searchKeyword}
+            onChange={(e) => setSearchKeyword(e.target.value)}
+            placeholder="搜索歌手..."
+            type="search"
+            className="al-search-input"
+            aria-label="搜索歌手"
+          />
+        </div>
       </div>
 
       {loading ? (
@@ -318,7 +382,7 @@ export default function ArtistList() {
           <Skeleton lines={6} />
         </div>
       ) : sortedLetters.length === 0 ? (
-        <p className="al-empty-hint">暂无歌手数据</p>
+        <p className="al-empty-hint">{searchQ ? '未找到相关歌手' : '暂无歌手数据'}</p>
       ) : (
         <>
           <div style={{ paddingLeft: 'var(--space-xl)', paddingRight: 'calc(var(--space-xl) + 44px)' }}>
@@ -359,6 +423,7 @@ export default function ArtistList() {
             ))}
           </div>
 
+          {!searchQ && (
           <nav className="al-index-bar" role="navigation" aria-label="字母索引">
             {ALPHABET.map(letter => {
               const exists = !!grouped[letter];
@@ -377,6 +442,7 @@ export default function ArtistList() {
               );
             })}
           </nav>
+          )}
         </>
       )}
 

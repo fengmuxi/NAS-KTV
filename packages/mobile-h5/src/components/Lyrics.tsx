@@ -2,7 +2,7 @@
  * states: default · hover · focus-visible · active · disabled · loading · error · success
  */
 
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect } from 'react';
 
 interface LyricLine {
   time: number;
@@ -77,19 +77,8 @@ const css = `
 .lyric-line--current {
   font-size: var(--text-lg);
   font-weight: 600;
-  /* 进度渐变着色：已播放部分 accent，未播放部分 ink，随 background-position 平滑过渡 */
-  background-image: linear-gradient(
-    to right,
-    var(--color-accent) 50%,
-    var(--color-ink) 50%
-  );
-  background-size: 200% 100%;
-  background-repeat: no-repeat;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  /* 过渡时长 < 插值步进（150ms），避免累积滞后 */
-  transition: background-position 0.15s linear;
+  /* 整行 accent 高亮：不用 background-clip:text 文字渐变（长歌词换行时渐变会覆盖多行） */
+  color: var(--color-accent);
 }
 .lyric-line--past {
   color: var(--color-ink-3);
@@ -101,30 +90,9 @@ const css = `
 }
 `;
 
-export default function Lyrics({ lines, currentIndex, currentTime, playing }: LyricsProps) {
+export default function Lyrics({ lines, currentIndex }: LyricsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const safeLines = Array.isArray(lines) ? lines : [];
-
-  // 本地插值时钟：TV 广播 currentTime 约每秒一次，若直接使用渐变会每秒跳变。
-  // 播放中每 150ms 以「最近广播时间 + 流逝时长」推进，广播到达即校准，无累积漂移。
-  const [displayTime, setDisplayTime] = useState(currentTime ?? 0);
-  const baseRef = useRef({ t: currentTime ?? 0, at: Date.now() });
-
-  useEffect(() => {
-    baseRef.current = { t: currentTime ?? 0, at: Date.now() };
-  }, [currentTime]);
-
-  useEffect(() => {
-    if (!playing) {
-      setDisplayTime(currentTime ?? 0);
-      return;
-    }
-    const id = window.setInterval(() => {
-      const { t, at } = baseRef.current;
-      setDisplayTime(t + (Date.now() - at) / 1000);
-    }, 150);
-    return () => window.clearInterval(id);
-  }, [playing, currentTime]);
 
   // 只滚动歌词容器本身，避免 scrollIntoView 波及外层横向 swiper（否则歌词切行会把遥控屏拖回歌词屏）
   useEffect(() => {
@@ -142,17 +110,6 @@ export default function Lyrics({ lines, currentIndex, currentTime, playing }: Ly
       (containerRect.height - elRect.height) / 2;
     container.scrollTo({ top: targetTop, behavior: 'smooth' });
   }, [currentIndex]);
-
-  // 当前行播放进度 0~1：行起始 ~ 下一行起始（最后一行默认 5s）
-  const lineStart = currentIndex >= 0 ? (safeLines[currentIndex]?.time ?? 0) : 0;
-  const lineEnd =
-    currentIndex >= 0 && currentIndex + 1 < safeLines.length
-      ? (safeLines[currentIndex + 1]?.time ?? lineStart + 5000)
-      : lineStart + 5000;
-  const lineProgress =
-    lineEnd > lineStart
-      ? Math.max(0, Math.min(1, (displayTime - lineStart) / (lineEnd - lineStart)))
-      : 0;
 
   if (safeLines.length === 0) {
     return (
@@ -180,11 +137,6 @@ export default function Lyrics({ lines, currentIndex, currentTime, playing }: Ly
                   key={i}
                   data-lyric-index={i}
                   className={`lyric-line${isCurrent ? ' lyric-line--current' : ''}${isPast ? ' lyric-line--past' : ''}`}
-                  style={
-                    isCurrent
-                      ? { backgroundPosition: `${(1 - lineProgress) * 100}% 0` }
-                      : undefined
-                  }
                 >
                   {line.text || '…'}
                 </p>

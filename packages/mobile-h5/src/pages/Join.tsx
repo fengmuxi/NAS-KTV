@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useRoomStore } from '../stores/room';
 import { roomsApi } from '../api/rooms';
 import QrScanner from '../components/QrScanner';
@@ -371,24 +371,25 @@ export default function Join() {
     setLeaveReason(messages[reason] ?? null);
   }, []);
 
-  // 通过二维码链接（手机系统/微信「扫一扫」直接打开）进入时，授权码已随 URL 带入。
-  // 直接自动加入房间，无需用户再手动点击「加入房间」按钮。
+  // 通过二维码链接（手机系统/微信「扫一扫」直接打开）进入时，授权码已随 URL 带入，自动加入房间。
+  // 依赖 URL 中的授权码（location.search）而非仅挂载一次：同一页面再次扫码时
+  // （URL 授权码变化、路由未变、组件不重新挂载），仍会用新授权码自动加入，而非沿用旧授权码。
   // 昵称由 loadNickname 保底（无保存值时自动生成随机昵称），不会因昵称为空而中断自动加入。
-  const autoJoinedRef = useRef(false);
+  const location = useLocation();
+  const handledCodeRef = useRef<string | null>(null);
   useEffect(() => {
-    if (autoJoinedRef.current) return;
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(location.search);
     const codeFromUrl = params.get('authorizationCode');
     const tokenFromUrl = params.get('joinToken');
-    if (codeFromUrl && /^[A-Z0-9]{6}$/.test(codeFromUrl)) {
-      setAuthorizationCode(codeFromUrl);
-      setJoinToken(tokenFromUrl);
-      autoJoinedRef.current = true;
-      // handleJoin 为函数声明，已 hoisted；此处自动加入，避免扫完还需手动点击
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      handleJoin(codeFromUrl, tokenFromUrl);
-    }
-  }, []);
+    if (!codeFromUrl || !/^[A-Z0-9]{6}$/.test(codeFromUrl)) return;
+    if (handledCodeRef.current === codeFromUrl) return; // 同一授权码只自动加入一次（含 StrictMode 双调）
+    handledCodeRef.current = codeFromUrl;
+    setAuthorizationCode(codeFromUrl);
+    setJoinToken(tokenFromUrl);
+    // handleJoin 为函数声明，已 hoisted；此处自动加入，避免扫完还需手动点击
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    handleJoin(codeFromUrl, tokenFromUrl);
+  }, [location.search]);
 
   async function handleJoin(code: string, token: string | null = joinToken) {
     if (code.length !== 6) {

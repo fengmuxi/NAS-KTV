@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useQueueStore } from '../stores/queue';
 import { useRoomStore } from '../stores/room';
@@ -86,6 +87,10 @@ const css = `
   color: var(--color-on-accent);
   cursor: pointer;
   box-shadow: var(--shadow-lg);
+  /* 可拖动：禁用触摸滚动/文本选中，避免拖拽时页面跟着滑动 */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
   transition: background-color var(--dur-fast) var(--ease-out),
               transform var(--dur-micro) var(--ease-out),
               box-shadow var(--dur-fast) var(--ease-out);
@@ -545,6 +550,51 @@ const css = `
   background-color: var(--color-accent);
 }
 
+/* 导航点击切换：遥控 / 歌词 tab（扁平化：无背景无边框，激活态底部指示条） */
+.np-switch-tabs {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-md);
+  padding-bottom: var(--space-sm);
+}
+
+.np-switch-tab {
+  position: relative;
+  padding: 8px 4px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-ink-3);
+  background: none;
+  border: none;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+
+.np-switch-tab:hover {
+  color: var(--color-ink);
+}
+
+.np-switch-tab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-accent);
+}
+
+.np-switch-tab--active {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.np-switch-tab--active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 28px;
+  height: 3px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-accent);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rc-fab,
   .rc-overlay,
@@ -570,6 +620,62 @@ export default function RemoteControl() {
     closeRemote,
   } = useQueueStore();
   const [lyrics, setLyrics] = useState<LyricLine[]>([]);
+
+  // 悬浮遥控按钮：可拖动。pointer 事件拖动，位移超过阈值视为拖动（不触发点击）
+  const fabRef = useRef<HTMLButtonElement>(null);
+  const [fabPos, setFabPos] = useState<{ x: number; y: number } | null>(null);
+  const dragRef = useRef({
+    dragging: false,
+    startX: 0,
+    startY: 0,
+    startLeft: 0,
+    startTop: 0,
+    moved: false,
+  });
+
+  const handleFabPointerDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    const btn = fabRef.current;
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    dragRef.current = {
+      dragging: true,
+      startX: e.clientX,
+      startY: e.clientY,
+      startLeft: rect.left,
+      startTop: rect.top,
+      moved: false,
+    };
+    btn.setPointerCapture(e.pointerId);
+  };
+
+  const handleFabPointerMove = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    const d = dragRef.current;
+    if (!d.dragging) return;
+    const dx = e.clientX - d.startX;
+    const dy = e.clientY - d.startY;
+    if (!d.moved && Math.abs(dx) + Math.abs(dy) < 6) return; // 拖动阈值，区分点击
+    d.moved = true;
+    const w = fabRef.current?.offsetWidth ?? 56;
+    const h = fabRef.current?.offsetHeight ?? 56;
+    const x = Math.max(0, Math.min(window.innerWidth - w, d.startLeft + dx));
+    const y = Math.max(0, Math.min(window.innerHeight - h, d.startTop + dy));
+    setFabPos({ x, y });
+  };
+
+  const handleFabPointerEnd = () => {
+    dragRef.current.dragging = false;
+  };
+
+  const handleFabClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (dragRef.current.moved) {
+      e.preventDefault();
+      e.stopPropagation();
+      dragRef.current.moved = false;
+      return;
+    }
+    openRemote();
+  };
 
   // 歌词偏移（ms）：房间级权威值，仅由 TV 端广播驱动，不做本地持久化
   const [lyricOffsetMs, setLyricOffsetMs] = useState(0);
@@ -639,38 +745,8 @@ export default function RemoteControl() {
         ? '混响 自定义'
         : `混响 ${REVERB_PRESETS.find(p => p.value === reverbPreset)?.label ?? reverbPreset}`;
 
-  // 顶部滑动切换：歌词 / 遥控 两屏
-  // 两屏常驻渲染；只有用户手势滑动才切换，程序性滚动不会触发
-  const [swiperScreen, setSwiperScreen] = useState<'lyrics' | 'remote'>('lyrics');
-  const swiperRef = useRef<HTMLDivElement>(null);
-  const userSwipeRef = useRef(false);
-  const swipeResetTimerRef = useRef<number>(0);
-  const handleSwiperScroll = useCallback(() => {
-    const el = swiperRef.current;
-    if (!el) return;
-    const idx = Math.round(el.scrollLeft / el.clientWidth);
-    if (userSwipeRef.current) {
-      setSwiperScreen(idx >= 1 ? 'remote' : 'lyrics');
-      return;
-    }
-    // 手势结束后的 snap 动画阶段：若停留位置在两屏中间，强制吸附到最近屏，
-    // 避免 snap 被内层歌词滚动容器干扰后停在中间（只滑动一段距离而不切换）
-    const target = idx >= 1 ? el.clientWidth : 0;
-    if (Math.abs(el.scrollLeft - target) > 1) {
-      el.scrollTo({ left: target, behavior: 'smooth' });
-    }
-  }, []);
-  const handleSwipeStart = useCallback(() => {
-    userSwipeRef.current = true;
-    window.clearTimeout(swipeResetTimerRef.current);
-  }, []);
-  const handleSwipeEnd = useCallback(() => {
-    window.clearTimeout(swipeResetTimerRef.current);
-    swipeResetTimerRef.current = window.setTimeout(() => {
-      userSwipeRef.current = false;
-    }, 300);
-  }, []);
-  useEffect(() => () => window.clearTimeout(swipeResetTimerRef.current), []);
+  // 导航点击切换：遥控 / 歌词 两屏；默认优先显示遥控（控制器）内容
+  const [swiperScreen, setSwiperScreen] = useState<'lyrics' | 'remote'>('remote');
 
   // 弹层打开时锁定页面滚动
   useEffect(() => {
@@ -813,8 +889,14 @@ export default function RemoteControl() {
 
       {showFab && (
         <button
-          onClick={openRemote}
+          ref={fabRef}
+          onClick={handleFabClick}
+          onPointerDown={handleFabPointerDown}
+          onPointerMove={handleFabPointerMove}
+          onPointerUp={handleFabPointerEnd}
+          onPointerCancel={handleFabPointerEnd}
           className="rc-fab"
+          style={fabPos ? { left: fabPos.x, top: fabPos.y, right: 'auto' } : undefined}
           data-state={isPlaying ? 'playing' : undefined}
           aria-label="打开遥控器"
           aria-expanded={remoteOpen}
@@ -875,28 +957,43 @@ export default function RemoteControl() {
             </div>
           </section>
 
-          {/* 歌词 / 遥控 滑动切换 */}
+          {/* 遥控 / 歌词 导航切换，默认优先显示遥控（控制器）内容 */}
           <div className="np-swiper">
-            <div
-              className="np-swiper-track"
-              ref={swiperRef}
-              onScroll={handleSwiperScroll}
-              onPointerDown={handleSwipeStart}
-              onPointerUp={handleSwipeEnd}
-              onPointerCancel={handleSwipeEnd}
-              aria-label="歌词与遥控切换"
-            >
-                  {/* 歌词屏 */}
-                  <section className="np-screen np-screen--lyrics" aria-label="歌词">
-                    <Lyrics
-                      lines={lyrics}
-                      currentIndex={currentLyricIndex}
-                      currentTime={displayTime + lyricOffsetMs / 1000}
-                      playing={isPlaying && remoteOpen}
-                    />
-                  </section>
+            <div className="np-switch-tabs" role="tablist" aria-label="界面切换">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={swiperScreen === 'remote'}
+                aria-label="遥控"
+                tabIndex={0}
+                onClick={() => setSwiperScreen('remote')}
+                className={`np-switch-tab${swiperScreen === 'remote' ? ' np-switch-tab--active' : ''}`}
+              >
+                遥控
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={swiperScreen === 'lyrics'}
+                aria-label="歌词"
+                tabIndex={0}
+                onClick={() => setSwiperScreen('lyrics')}
+                className={`np-switch-tab${swiperScreen === 'lyrics' ? ' np-switch-tab--active' : ''}`}
+              >
+                歌词
+              </button>
+            </div>
 
-              {/* 遥控屏 */}
+            {swiperScreen === 'lyrics' ? (
+              <section className="np-screen np-screen--lyrics" aria-label="歌词">
+                <Lyrics
+                  lines={lyrics}
+                  currentIndex={currentLyricIndex}
+                  currentTime={displayTime + lyricOffsetMs / 1000}
+                  playing={isPlaying && remoteOpen}
+                />
+              </section>
+            ) : (
               <section className="np-screen" aria-label="遥控">
                 <div className="np-controls">
                   <ProgressBar
@@ -1147,22 +1244,7 @@ export default function RemoteControl() {
                   )}
                 </div>
               </section>
-            </div>
-
-            <div className="np-swiper-dots" role="tablist" aria-label="界面切换指示">
-              <span
-                className={`np-swiper-dot${swiperScreen === 'lyrics' ? ' np-swiper-dot--active' : ''}`}
-                role="tab"
-                aria-selected={swiperScreen === 'lyrics'}
-                aria-label="歌词"
-              />
-              <span
-                className={`np-swiper-dot${swiperScreen === 'remote' ? ' np-swiper-dot--active' : ''}`}
-                role="tab"
-                aria-selected={swiperScreen === 'remote'}
-                aria-label="遥控"
-              />
-            </div>
+            )}
           </div>
         </div>
       </div>

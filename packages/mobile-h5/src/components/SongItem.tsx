@@ -2,11 +2,13 @@
  * states: default · hover · focus-visible · active · disabled · loading · error · success
  */
 
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Song } from '@nasktv/shared';
 import { useAddToQueue } from '../hooks/useAddToQueue';
 import { useInsertNext } from '../hooks/useInsertNext';
 import { useQueueSong } from '../hooks/useQueueSong';
 import { useQueueStore } from '../stores/queue';
+import { useToastStore } from '../stores/toast';
 import { Plus, Check, Loader2, ListStart, ChevronsUp, Play } from 'lucide-react';
 
 interface SongItemProps {
@@ -142,6 +144,23 @@ const css = `
   cursor: not-allowed;
   pointer-events: none;
 }
+/* 顶歌按钮：accent 醒目样式，与"灰色=禁用"的视觉彻底区分 */
+.si-icon-btn--top {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background-color: var(--color-accent-soft);
+}
+.si-icon-btn--top:hover {
+  border-color: var(--color-accent-hover);
+  color: var(--color-accent-hover);
+  background-color: var(--color-accent-soft);
+}
+/* 顶歌成功反馈：绿色 ✓（覆盖通用 --top accent 态） */
+.si-icon-btn--top[data-state="success"] {
+  border-color: var(--color-success);
+  color: var(--color-success);
+  background-color: var(--color-success-soft);
+}
 .si-icon-btn[data-state="loading"] svg {
   animation: si-spin 0.8s linear infinite;
 }
@@ -206,16 +225,44 @@ export default function SongItem({ song }: SongItemProps) {
   const { insertNext, insertedSongIds, loadingSongIds: insertLoadingIds } = useInsertNext();
   const { inQueue, isFirstInQueue, topSong } = useQueueSong(song.id);
   const { currentItem } = useQueueStore();
+  const showToast = useToastStore((s) => s.show);
   const isPlayingNow = currentItem?.songId === song.id;
   const isLoading = loadingSongIds.has(song.id);
   const isAdded = addedSongIds.has(song.id) || inQueue;
   const isInserting = insertLoadingIds.has(song.id);
   const isInserted = insertedSongIds.has(song.id);
-  const disabled = isLoading || isAdded || isInserting || isInserted || isPlayingNow;
-  const topLoading = isLoading || isInserting;
-  // 顶歌按钮仅受加载中/播放中/已是最前限制；isAdded（已在队列）不禁用它，
-  // 否则已在待播队列的歌永远无法顶歌（disabled 含 inQueue，会导致按钮常灰）
-  const topDisabled = topLoading || isPlayingNow || isFirstInQueue;
+  // 行级禁用只限「加载中/插队中/播放中」；「已在待播队列」只是点歌按钮的禁用态，
+  // 不能连累整行 —— 否则 data-disabled 的 pointer-events:none 会屏蔽顶歌按钮的点击
+  const rowDisabled = isLoading || isInserting || isPlayingNow;
+  const disabled = rowDisabled || isAdded || isInserted;
+  // 顶歌按钮保持可点（仅加载中/播放中禁用），点击时区分反馈：
+  // 已在待播最前 → toast 提示；否则置顶成功提示。避免「已在队列却无法置顶」的常灰困惑。
+  const [topPending, setTopPending] = useState(false);
+  // 顶歌成功后的按钮级反馈：短暂显示绿色 ✓（用户不一定注意到底部 toast）
+  const [topDone, setTopDone] = useState(false);
+  const topDoneTimer = useRef<number>(0);
+  const topLoading = isLoading || isInserting || topPending;
+  const topDisabled = topLoading || isPlayingNow || topDone;
+  const handleTop = useCallback(async () => {
+    if (isFirstInQueue) {
+      showToast('已在待播最前，无需置顶', 'info');
+      return;
+    }
+    setTopPending(true);
+    try {
+      await topSong();
+      setTopDone(true);
+      showToast('已置顶到待播最前', 'success');
+      window.clearTimeout(topDoneTimer.current);
+      topDoneTimer.current = window.setTimeout(() => setTopDone(false), 2000);
+    } catch {
+      showToast('置顶失败，请重试', 'error');
+    } finally {
+      setTopPending(false);
+    }
+  }, [isFirstInQueue, topSong, showToast]);
+
+  useEffect(() => () => window.clearTimeout(topDoneTimer.current), []);
 
   const durationText =
     song.duration > 0
@@ -227,7 +274,7 @@ export default function SongItem({ song }: SongItemProps) {
       <style>{css}</style>
       <div
         className="si-row"
-        data-disabled={disabled ? 'true' : undefined}
+        data-disabled={rowDisabled ? 'true' : undefined}
         data-state={isLoading ? 'loading' : undefined}
       >
         <div className="flex-1 min-w-0">
@@ -255,16 +302,18 @@ export default function SongItem({ song }: SongItemProps) {
 
         {inQueue ? (
           <button
-            onClick={() => topSong()}
+            onClick={handleTop}
             disabled={topDisabled}
-            className="si-icon-btn"
-            data-state={topLoading ? 'loading' : undefined}
-            aria-label={isFirstInQueue ? '已在待播最前' : '顶歌'}
+            className="si-icon-btn si-icon-btn--top"
+            data-state={topLoading ? 'loading' : topDone ? 'success' : undefined}
+            aria-label="顶歌"
             title={isFirstInQueue ? '已在待播最前' : '顶歌'}
             type="button"
           >
             {topLoading ? (
               <Loader2 size={18} strokeWidth={2} />
+            ) : topDone ? (
+              <Check size={18} strokeWidth={2.2} />
             ) : (
               <ChevronsUp size={18} strokeWidth={2} />
             )}

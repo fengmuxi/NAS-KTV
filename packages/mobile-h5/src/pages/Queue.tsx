@@ -1146,20 +1146,24 @@ export default function Queue() {
                 <p className="q-sheet-title">{actionItem.songTitle}</p>
                 <p className="q-sheet-artist">{actionItem.songArtist}</p>
               </div>
-              {actionItem.userSessionId === String(sessionId) && (
-                <button
-                  className="q-sheet-item"
-                  onClick={() => runAction(() => handleTop(actionItem.id), '置顶失败')}
-                  disabled={isActionItemFirst}
-                  tabIndex={0}
-                  role="button"
-                  type="button"
-                >
-                  <ChevronsUp size={18} />
-                  顶歌
-                  {isActionItemFirst && <span className="ml-auto q-tab-count">已是最前</span>}
-                </button>
-              )}
+              {/* 顶歌不限归属：房间内任意会话都可顶歌 */}
+              <button
+                className="q-sheet-item"
+                onClick={() => {
+                  if (isActionItemFirst) {
+                    showError('已在待播最前，无需置顶');
+                    return;
+                  }
+                  runAction(() => handleTop(actionItem.id), '置顶失败');
+                }}
+                tabIndex={0}
+                role="button"
+                type="button"
+              >
+                <ChevronsUp size={18} />
+                顶歌
+                {isActionItemFirst && <span className="ml-auto q-tab-count">已是最前</span>}
+              </button>
               <button
                 className="q-sheet-item"
                 onClick={() => runAction(() => handleSkip(actionItem.id), '跳过失败')}
