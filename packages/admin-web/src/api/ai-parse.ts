@@ -74,6 +74,9 @@ export const aiParseApi = {
   getTask: (id: number): Promise<AiParseTask & { song: { id: number; title: string; filePath: string; artistName?: string; artistNames?: string[] } }> =>
     client.get<ApiResponse<AiParseTask & { song: { id: number; title: string; filePath: string; artistName?: string; artistNames?: string[] } }>>(`/ai-parse/tasks/${id}`).then(r => r.data.data),
 
+  getTaskBySongId: (songId: number): Promise<AiParseTask> =>
+    client.get<ApiResponse<AiParseTask>>(`/ai-parse/tasks/by-song/${songId}`).then(r => r.data.data),
+
   trigger: (songId: number): Promise<{ taskId: number }> =>
     client.post<ApiResponse<{ taskId: number }>>('/ai-parse/trigger', { songId }).then(r => r.data.data),
 

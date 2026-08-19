@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Pencil, Trash2, Bot, Mic, Music, Search, RotateCcw, Headphones, Film, X, FileText, Upload, RefreshCw } from 'lucide-react';
+import { Pencil, Trash2, Bot, Mic, Music, Search, RotateCcw, Headphones, Film, X, FileText, Upload, RefreshCw, ClipboardCheck } from 'lucide-react';
 import Button from '../components/Button';
 import EmptyState from '../components/EmptyState';
 import ConfirmModal from '../components/ConfirmModal';
@@ -31,12 +31,37 @@ function formatDuration(sec: number): string {
   return `${m}:${r.toString().padStart(2, '0')}`;
 }
 
-function aiParseBadge(aiParsed: number): {
+function safeParseJson(raw: string | null | undefined): Record<string, unknown> | null {
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw);
+    return typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+function ReviewCompareRow({ label, current, suggested }: { label: string; current: string; suggested: string }) {
+  const changed = suggested !== '—' && suggested !== current;
+  return (
+    <div className="flex items-start justify-between gap-md text-sm">
+      <span className="text-ink-3 shrink-0 w-12">{label}</span>
+      <div className="flex-1 min-w-0 text-right">
+        <span className={changed ? 'text-ink-3 line-through' : 'text-ink'}>{current}</span>
+        {changed && <div className="text-accent font-medium break-words">{suggested}</div>}
+      </div>
+    </div>
+  );
+}
+
+function aiParseBadge(aiParsed: number, aiNeedReview?: number): {
   variant: 'success' | 'neutral' | 'warning';
   label: string;
 } {
   if (aiParsed === 1) return { variant: 'success', label: '已解析' };
-  if (aiParsed === 2) return { variant: 'warning', label: '待审核' };
+  // aiParsed===2：待审核（仍需处理）与已审阅（已被拒绝/保留本地）区分开
+  if (aiParsed === 2 && aiNeedReview === 1) return { variant: 'warning', label: '待审核' };
+  if (aiParsed === 2) return { variant: 'neutral', label: '已审阅' };
   return { variant: 'neutral', label: '未解析' };
 }
 
@@ -117,6 +142,12 @@ export default function Songs() {
   const [lyricsSaving, setLyricsSaving] = useState(false);
   const [lyricsLineCount, setLyricsLineCount] = useState(0);
   const lyricsFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // AI 解析审核（歌曲管理页直接审核入口）
+  const [reviewSong, setReviewSong] = useState<Song | null>(null);
+  const [reviewTask, setReviewTask] = useState<import('../api/ai-parse').AiParseTask | null>(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
 
   const [pendingDelete, setPendingDeleteState] = useState<{
     songs: Song[];
@@ -468,6 +499,43 @@ export default function Songs() {
     }
   };
 
+  // AI 解析审核：从歌曲管理页直接打开待审核任务
+  const openReview = async (song: Song) => {
+    setReviewSong(song);
+    setReviewTask(null);
+    setReviewLoading(true);
+    try {
+      const task = await aiParseApi.getTaskBySongId(song.id);
+      if (task.needReview !== 1) {
+        showToast('warning', '该歌曲暂无待审核的 AI 解析结果');
+        setReviewSong(null);
+        return;
+      }
+      setReviewTask(task);
+    } catch {
+      showToast('error', '未找到该歌曲的 AI 解析任务');
+      setReviewSong(null);
+    } finally {
+      setReviewLoading(false);
+    }
+  };
+
+  const handleReview = async (action: 'approve' | 'reject') => {
+    if (!reviewTask) return;
+    setReviewSubmitting(true);
+    try {
+      await aiParseApi.review(reviewTask.id, { action });
+      showToast('success', action === 'approve' ? '已通过审核并应用' : '已拒绝该解析结果');
+      setReviewSong(null);
+      setReviewTask(null);
+      await fetchSongs({ showLoading: false });
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : '审核操作失败');
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
   // Batch operations
   const selectedSongs = songs.filter((s) => selectedIds.has(s.id));
   const batchCount = selectedIds.size;
@@ -773,7 +841,7 @@ export default function Songs() {
                 </tr>
               ) : (
                 songs.map((song) => {
-                  const ai = aiParseBadge(song.aiParsed);
+                  const ai = aiParseBadge(song.aiParsed, song.aiNeedReview);
                   const sep = separationBadge(song.separationStatus);
                   const ft = fileTypeBadge(song.fileType);
                   const selected = selectedIds.has(song.id);
@@ -891,6 +959,17 @@ export default function Songs() {
                           >
                             <Bot className="w-4 h-4" />
                           </button>
+                          {song.aiParsed === 2 && song.aiNeedReview === 1 && (
+                            <button
+                              onClick={() => openReview(song)}
+                              disabled={busy || reviewLoading}
+                              className="p-1.5 rounded-md text-warning hover:text-warning hover:bg-paper-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors disabled:opacity-50"
+                              aria-label="审核 AI 解析"
+                              title="审核 AI 解析"
+                            >
+                              <ClipboardCheck className="w-4 h-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => setPendingSeparation(song)}
                             disabled={busy}
@@ -1163,6 +1242,71 @@ export default function Songs() {
           separationStatus={videoPreviewSong.separationStatus}
         />
       )}
+
+      {/* AI 解析审核弹窗（歌曲管理页直接审核入口） */}
+      <Modal
+        isOpen={!!reviewSong}
+        onClose={() => { setReviewSong(null); setReviewTask(null); }}
+        title="审核 AI 解析结果"
+      >
+        {reviewLoading ? (
+          <Loading />
+        ) : reviewTask ? (
+          <div className="space-y-md">
+            <p className="text-sm text-ink-3">
+              对比本地现有信息与 AI 识别建议，选择通过（应用 AI 结果）或拒绝（保留本地信息）。
+            </p>
+            <ReviewCompareRow
+              label="歌曲名"
+              current={reviewSong?.title || '—'}
+              suggested={String((safeParseJson(reviewTask.result)?.title) ?? '—')}
+            />
+            <ReviewCompareRow
+              label="歌手"
+              current={
+                reviewSong?.artistNames?.length
+                  ? reviewSong.artistNames.join('、')
+                  : (reviewSong?.artistName || '—')
+              }
+              suggested={(() => {
+                const p = safeParseJson(reviewTask.result);
+                if (!p) return '—';
+                const artists = Array.isArray(p.artists) ? p.artists : (p.artist ? [p.artist] : []);
+                return artists.length ? artists.join('、') : '—';
+              })()}
+            />
+            <ReviewCompareRow
+              label="专辑"
+              current="—"
+              suggested={String((safeParseJson(reviewTask.result)?.album) ?? '—')}
+            />
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-ink-3">置信度</span>
+              <span className="font-mono text-ink">
+                {reviewTask.confidence != null ? `${Math.round(reviewTask.confidence * 100)}%` : '—'}
+              </span>
+            </div>
+            <div className="flex items-center gap-sm pt-sm">
+              <Button
+                variant="primary"
+                onClick={() => handleReview('approve')}
+                loading={reviewSubmitting}
+                className="flex-1"
+              >
+                通过并应用
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => handleReview('reject')}
+                loading={reviewSubmitting}
+                className="flex-1"
+              >
+                拒绝
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
 
       <ToastContainer />
     </div>

@@ -22,6 +22,8 @@ export interface Song {
   duration: number;
   lyricsPath: string | null;
   aiParsed: number;
+  /** 是否需要人工审核 AI 解析结果（1=待审核，0=已处理/无需审核） */
+  aiNeedReview?: number;
   separationStatus?: string | null;
   createdAt: string;
   categories?: { categoryId: number; categoryName: string; categoryItemId: number; categoryItemName: string }[];

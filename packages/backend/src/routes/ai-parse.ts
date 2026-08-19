@@ -217,6 +217,41 @@ router.get('/ai-parse/tasks', authenticateToken, async (req: Request, res: Respo
 });
 
 /**
+ * GET /api/ai-parse/tasks/by-song/:songId - 按歌曲获取最近一次解析任务
+ * 供歌曲管理页直接审核使用：定位该歌曲待审核（或最近一次）的解析结果。
+ */
+router.get('/ai-parse/tasks/by-song/:songId', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const songId = parseInt(req.params.songId);
+    if (!songId || isNaN(songId)) {
+      return res.status(400).json({ success: false, error: 'songId is required' });
+    }
+
+    // 优先取待审核任务，否则取最近一次任务
+    const pending = db.select()
+      .from(schema.aiParseTasks)
+      .where(and(eq(schema.aiParseTasks.songId, songId), eq(schema.aiParseTasks.needReview, 1)))
+      .orderBy(desc(schema.aiParseTasks.createdAt))
+      .get();
+
+    const task = pending ?? db.select()
+      .from(schema.aiParseTasks)
+      .where(eq(schema.aiParseTasks.songId, songId))
+      .orderBy(desc(schema.aiParseTasks.createdAt))
+      .get();
+
+    if (!task) {
+      return res.status(404).json({ success: false, error: 'No AI parse task for this song' });
+    }
+
+    res.json({ success: true, data: task });
+  } catch (error) {
+    logger.error('Error getting AI parse task by song:', error);
+    res.status(500).json({ success: false, error: 'Failed to get AI parse task' });
+  }
+});
+
+/**
  * GET /api/ai-parse/tasks/:id - 获取解析任务详情
  */
 router.get('/ai-parse/tasks/:id', authenticateToken, async (req: Request, res: Response) => {
@@ -303,12 +338,18 @@ router.post('/ai-parse/tasks/:id/review', authenticateToken, async (req: Request
       
       res.json({ success: true, message: 'Modified result applied' });
     } else if (action === 'reject') {
-      // 拒绝
+      // 拒绝：清理任务待审核标记，并清除歌曲的待审核标记
+      // （否则歌曲管理页徽标会永远停在「待审核」，可无限次重复审核）
       db.update(schema.aiParseTasks)
         .set({ needReview: 0, status: 'rejected' })
         .where(eq(schema.aiParseTasks.id, taskId))
         .run();
-      
+
+      db.update(schema.songs)
+        .set({ aiNeedReview: 0 })
+        .where(eq(schema.songs.id, task.songId!))
+        .run();
+
       res.json({ success: true, message: 'Result rejected' });
     } else {
       res.status(400).json({ success: false, error: 'Invalid action' });
