@@ -1,4 +1,4 @@
-import { eq, and, sql, gt, lt, lte, isNotNull, isNull, inArray } from 'drizzle-orm';
+import { eq, and, sql, gt, lt, lte, isNotNull, isNull, inArray, ne } from 'drizzle-orm';
 import { db, schema } from '../db';
 import logger from '../logger';
 import type {
@@ -1006,14 +1006,15 @@ export async function topQueueItem(
   sessionToken: string,
 ): Promise<RoomQueue | null> {
   return withRoomLock(roomId, async () => {
-    const actor = await assertMobileRoomControl(roomId, sessionToken);
-    return topQueueItemInternal(roomId, queueItemId, String(actor.sessionId));
+    // 仅校验会话有效性（房间准入），不限制只能顶自己点的歌
+    await assertMobileRoomControl(roomId, sessionToken);
+    return topQueueItemInternal(roomId, queueItemId);
   });
 }
 
 /**
  * 顶歌（锁内执行）：把指定 pending 队列项移动到待播最前（playing 之后第一位）。
- * - 仅允许顶自己点的歌（userSessionId 归属校验，与取消点歌一致）
+ * - 不限制归属：房间内任意有效会话均可顶歌（家庭 KTV 场景）
  * - 目标位置：有 playing 项时为 playingSort+1，否则为待播最小 sortOrder-1
  * - 若该项已在最前，直接返回不修改。
  * 成功后推送 QUEUE_UPDATED。
@@ -1021,7 +1022,6 @@ export async function topQueueItem(
 async function topQueueItemInternal(
   roomId: number,
   queueItemId: number,
-  userSessionId: string,
 ): Promise<RoomQueue | null> {
   const [item] = await db
     .select()
@@ -1032,9 +1032,6 @@ async function topQueueItemInternal(
   if (!item) return null;
   if (item.status !== 'pending') {
     throw new Error('只能置顶待播队列中的歌曲');
-  }
-  if (String(item.userSessionId) !== userSessionId) {
-    throw new Error('只能置顶自己点的歌曲');
   }
 
   // 计算目标位置（playing 之后的第一个位置）
@@ -1239,6 +1236,41 @@ export async function joinRoom(
       joinedAt: new Date(),
     })
     .returning();
+
+  // 继承同房间同昵称旧 session 的待播歌曲归属，并退出旧 session：
+  // 手机扫码重加后 sessionId 会变化，若不做归属迁移，之前 session 点的歌会因
+  // 「只能置顶/取消自己点的歌」归属校验失败而无法管理（顶歌报错、弹层顶歌按钮消失）。
+  const staleSessions = await db
+    .select({ id: roomSessions.id })
+    .from(roomSessions)
+    .where(
+      and(
+        eq(roomSessions.roomId, room.id),
+        eq(roomSessions.nickname, params.nickname),
+        isNull(roomSessions.leftAt),
+        ne(roomSessions.id, session.id),
+      ),
+    );
+
+  if (staleSessions.length > 0) {
+    const staleIds = staleSessions.map((s) => s.id);
+    // 迁移待播/播放中的歌曲归属到新 session（历史 played/skipped 无需迁移）
+    await db
+      .update(roomQueues)
+      .set({ userSessionId: String(session.id) })
+      .where(
+        and(
+          eq(roomQueues.roomId, room.id),
+          inArray(roomQueues.userSessionId, staleIds.map(String)),
+          inArray(roomQueues.status, ['pending', 'playing']),
+        ),
+      );
+    // 退出旧 session，避免同房间同昵称 session 无限堆积
+    await db
+      .update(roomSessions)
+      .set({ leftAt: new Date() })
+      .where(inArray(roomSessions.id, staleIds));
+  }
 
   const sessionExpiresAt = getRoomSessionExpiresAt(session, room);
   const expiresInSeconds = Math.max(
