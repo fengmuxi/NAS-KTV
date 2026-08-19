@@ -12,7 +12,7 @@ export const songs = sqliteTable('songs', {
   lyricsPath: text('lyrics_path'),
   pitchDefault: integer('pitch_default').default(0),
   playCount: integer('play_count').default(0),
-  createdAt: integer('created_at', { mode: 'timestamp' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).defaultNow(),
 
   vocalsPath: text('vocals_path'),
   instrumentalPath: text('instrumental_path'),
