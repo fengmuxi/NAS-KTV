@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.6.0](https://github.com/fengmuxi/NAS-KTV/compare/v0.5.0...v0.6.0) (2026-08-27)
+
+
+### Features
+
+* **admin-web,backend:** 去重管理分页支持 ([cd9528d](https://github.com/fengmuxi/NAS-KTV/commit/cd9528d6a15d3c2b8135b68e816814311edb7adb))
+* **ai-parse:** AI 解析人工干预审核留痕 ([86dc078](https://github.com/fengmuxi/NAS-KTV/commit/86dc0787619201179ba86e1d062315f6bd609a1a))
+* **backend,admin-web,downloader:** 歌词检索与管理 ([c804a3c](https://github.com/fengmuxi/NAS-KTV/commit/c804a3cf244e06367c615eda0f5018db753e6401))
+* **backend,admin-web:** MV 转码功能 + 人声分离推理设备配置 ([a238648](https://github.com/fengmuxi/NAS-KTV/commit/a238648fb2aca60aa38db9ee624656a33d60382b))
+* **downloader,backend,tv-app,mobile-h5:** 逐字歌词（增强型 LRC）解析与播放端逐词高亮 ([ca8aa95](https://github.com/fengmuxi/NAS-KTV/commit/ca8aa95445064a4d25b0524bfe9ff4c272452eb5))
+* **mobile-h5:** 遥控器增加麦克风音量控制入口 ([1f955b2](https://github.com/fengmuxi/NAS-KTV/commit/1f955b27084c5d748f2ae87beee5d488a9ed307d))
+* **shared,backend:** 新增麦克风采集音量 WS 协议与中继 ([ffcd8d7](https://github.com/fengmuxi/NAS-KTV/commit/ffcd8d7b7f67bd6af49e9410049f4bf03cfbce5d))
+* **tv-app:** 麦克风采集音量控制（Web Audio 软件增益 + WS 桥接） ([89d639b](https://github.com/fengmuxi/NAS-KTV/commit/89d639b556428fa059a40313483bacbbe23174a5))
+
+
+### Bug Fixes
+
+* **backend:** 修复增强型 LRC 逐字时间戳正则捕获组缺失 ([b385341](https://github.com/fengmuxi/NAS-KTV/commit/b385341a306ee4858c5c8a96c240702352f8b478))
+* **mobile-h5:** 解除麦克风音量调节按钮对 supported 的门禁 ([94ba887](https://github.com/fengmuxi/NAS-KTV/commit/94ba887c82140885cb975bfc9a2bd5f27b0a3cc1))
+* **tv-app,mobile-h5:** 歌词逐字高亮 rAF 锚点随播放状态同步 ([c94261a](https://github.com/fengmuxi/NAS-KTV/commit/c94261a1b5b63edc6c35b1be8b0fe0af46788841))
+
 ## [0.5.0](https://github.com/fengmuxi/NAS-KTV/compare/v0.4.0...v0.5.0) (2026-08-19)
 
 
