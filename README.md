@@ -1,3 +1,5 @@
+
+
 # 飞牛 NAS KTV 系统（nasktv）
 
 ![Release](https://img.shields.io/github/v/release/fengmuxi/NAS-KTV?label=release)
@@ -36,6 +38,7 @@ nasktv/
 │   ├── mobile-h5/        # 手机点歌 H5 SPA（端口 5174 dev）
 │   ├── tv-app/           # Tauri Android TV App
 │   ├── separator/        # Python + Demucs 人声分离微服务（端口 8001）
+│   ├── downloader/       # Python + musicdl 歌曲下载微服务（端口 8002）
 │   └── shared/           # 共享类型与 Drizzle schema
 ├── deploy/               # 生产部署文档
 ├── docs/                 # 开发 / API 文档
